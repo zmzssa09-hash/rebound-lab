@@ -25,28 +25,17 @@ export const TAGS: TagDef[] = [
   { key: "legal", label: "소송·규제", kind: "event", re: /lawsuit|class action|investigat|probe|subpoena|\bsec (charges|inquiry)|recall|antitrust|fine[ds]?\b|penalt/ },
   { key: "fda", label: "임상·허가 악재", kind: "event", re: /fda (reject|warning|declin)|complete response letter|\bcrl\b|trial (fail|miss|halt)|fail(s|ed)? to meet|primary endpoint|clinical hold/ },
   { key: "mgmt", label: "경영진 리스크", kind: "event", re: /\b(ceo|cfo|chief executive|founder)\b.{0,40}(resign|step|depart|exit|leave|oust|replace|fate|allegation|scandal|remov)|(oust|remove|replace|fire|fate of).{0,40}\b(ceo|cfo|chief executive)|steps? down|misconduct|affair allegation/ },
-  { key: "downgrade", label: "투자의견 하향", kind: "analyst", re: /downgrad|cut to (sell|neutral|hold|underweight|underperform)/ },
-  { key: "targetcut", label: "목표가 하향", kind: "analyst", re: /(lower|lowers|lowered|cut|cuts|reduce|reduces|trim|trims)s? .{0,20}(price )?target/ },
   { key: "macro", label: "시장·업종 전반 약세", kind: "external", re: /stocks? (fall|slide|drop|tumble|sink|slump)|sell-?off|market (rout|slump|turmoil)|tariff|rate (hike|fear)|yields? (rise|jump|surge)|sector (slump|weak|rout)/ },
-  { key: "positive", label: "호재", kind: "positive", re: /\bbeats?\b|tops (estimates|expectations)|raises? (guidance|outlook|forecast)|upgrad|record (revenue|quarter|sales)|\bsurges?\b|\bsoars?\b|\bjumps?\b|approval|approved/ },
+  { key: "positive", label: "호재", kind: "positive", re: /\bbeats?\b|tops (estimates|expectations)|raises? (guidance|outlook|forecast)|record (revenue|quarter|sales)|\bsurges?\b|\bsoars?\b|\bjumps?\b|approval|approved/ },
 ];
 
-/** "Price Target ... to $35 From $65" 형식에서 방향 판정 */
-function targetDirection(title: string): "cut" | "raise" | null {
-  const m = title.match(/to \$?([\d.,]+) from \$?([\d.,]+)/i);
-  if (!m) return null;
-  const to = Number(m[1].replace(/,/g, ""));
-  const from = Number(m[2].replace(/,/g, ""));
-  if (!(to > 0) || !(from > 0)) return null;
-  return to < from ? "cut" : to > from ? "raise" : null;
-}
+/** 애널리스트 의견·목표가 기사 — 판단에 쓰지 않으므로 분류에서 제외 */
+const ANALYST_RE = /price target|downgrad|upgrad|initiat(es|ed) coverage|reiterat|maintains .{0,20}rating|analyst/i;
 
 export function tagHeadline(title: string): TagDef[] {
+  if (ANALYST_RE.test(title)) return [];
   const t = title.toLowerCase();
   const tags = TAGS.filter((d) => d.re.test(t));
-  const dir = /target/i.test(title) ? targetDirection(title) : null;
-  if (dir === "cut" && !tags.some((x) => x.key === "targetcut")) tags.push(TAGS.find((x) => x.key === "targetcut")!);
-  if (dir === "raise") return tags.filter((x) => x.key !== "targetcut").concat(tags.some((x) => x.key === "positive") ? [] : [TAGS.find((x) => x.key === "positive")!]);
   // 부정 태그가 있으면 '호재' 표시는 생략 (예: "beats but cuts guidance")
   if (tags.some((x) => x.kind !== "positive")) return tags.filter((x) => x.kind !== "positive");
   return tags;
@@ -115,6 +104,7 @@ export function analyzeDrop(
   const ret3m = periodReturn(bars, 63);
 
   const tagged: TaggedNews[] = news
+    .filter((n) => !ANALYST_RE.test(n.title)) // 애널리스트 의견 기사 제외
     .map((n) => ({ ...n, tags: tagHeadline(n.title).map(({ key, label, kind }) => ({ key, label, kind })) }))
     .sort((a, b) => b.time - a.time);
 

@@ -49,11 +49,16 @@ async function saveHistory(h: History) {
 const bonus = (streak: number) => Math.min(streak, 10) * 0.5;
 
 /** 기존 추천 종목이 자리를 유지할 수 있는지 */
-function keepReason(p: Pick): string | null {
+function keepReason(p: Pick, firstPrice: number): string | null {
   if (p.excluded) return p.excludeReason ?? "추천 조건 탈락";
   if (p.longTermOk === false) return "장기 보유 기준 미달";
   if (p.rsi != null && p.rsi >= KEEP_MAX_RSI) return `반등 진행 — RSI ${p.rsi.toFixed(0)} 도달`;
-  if (p.fairValue && p.price >= p.fairValue * 0.95) return "적정가치(목표가) 근접";
+  if (p.fairValue && p.price >= p.fairValue * 0.95) {
+    // 추천 이후 올라서 적정가에 닿은 경우와, 처음부터 적정가보다 비싼 경우를 구분
+    return p.price > firstPrice * 1.03
+      ? `적정가($${p.fairValue.toFixed(2)}) 근접 — 반등 목표 달성`
+      : `현재가가 적정가($${p.fairValue.toFixed(2)}) 이상 — 할인 매력 없음`;
+  }
   if (p.total < KEEP_MIN_SCORE) return `점수 하락 (${p.total}점)`;
   return null;
 }
@@ -75,7 +80,7 @@ export async function selectTop(evaluated: Pick[]): Promise<{ top: Pick[]; exits
       dropped.push({ e, reason: "시세·재무 데이터를 받지 못함", price: null });
       continue;
     }
-    const r = keepReason(p);
+    const r = keepReason(p, e.firstPrice);
     if (r) dropped.push({ e, reason: r, price: p.price });
     else incumbents.push({ ...p, streak: e.streak, rankScore: p.total + bonus(e.streak + 1) });
   }

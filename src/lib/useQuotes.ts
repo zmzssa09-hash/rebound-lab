@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { DropAnalysis } from "./dropReason";
+import type { HorizonGrade } from "./grades";
+import type { Resilience } from "./resilience";
+import type { Valuation } from "./valuation";
 import type { AutoScore } from "./scorecard";
 import type { ChartData, Fundamentals, QuoteError, QuoteSummary } from "./types";
 
@@ -11,6 +14,9 @@ export interface Insight {
   drop: DropAnalysis;
   auto: AutoScore;
   sectorKo: string | null;
+  valuation: Valuation;
+  resilience: Resilience;
+  grades: { short: HorizonGrade; long: HorizonGrade };
 }
 
 /** 실시간 갱신 주기 */

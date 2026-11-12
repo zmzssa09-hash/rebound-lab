@@ -5,7 +5,9 @@ import { setData, useAppData, useHydrated } from "@/lib/store";
 import { SCORE_ITEMS } from "@/lib/scorecard";
 import {
   CORE_IDEA,
+  FAIR_VALUE_MODEL,
   FINAL_PRINCIPLE,
+  HORIZON_GRADES,
   GLOSSARY,
   LEV_ETP_NOTES,
   PRETRADE_CHECKLIST,
@@ -110,8 +112,41 @@ export default function StrategyPage() {
         <p className="text-xs text-muted mt-3">
           모든 항목은 재무·시세·뉴스 데이터로 자동 채점되고, 종목 분석 화면에서 직접 수정할 수 있습니다. 자동 점수는 출발점일 뿐이며 실제
           점수는 최신 실적과 공시를 확인한 후 산정합니다. 매출 감소·현금흐름 적자가 데이터로 확인되면 회피 신호가 자동으로 켜집니다.
+          애널리스트 목표가·투자의견은 어떤 항목에도 사용하지 않습니다.
         </p>
       </Section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Section title="이중 투자전략 적정가 모델 1.0">
+          <ul className="space-y-3 text-sm">
+            {FAIR_VALUE_MODEL.map((m) => (
+              <li key={m.label} className="flex gap-3">
+                <span className="num font-semibold text-accent w-10 shrink-0">{m.weight}%</span>
+                <span>
+                  <span className="font-medium">{m.label}</span>
+                  <span className="block text-xs text-muted mt-0.5 leading-relaxed">{m.how}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted mt-3">계산할 수 없는 항목(예: FCF 적자 기업의 DCF)은 빼고 나머지 비중으로 다시 나눕니다. 가정에 민감한 참고 시나리오입니다.</p>
+        </Section>
+        <Section title="단기·장기 수익 등급">
+          <ul className="space-y-3 text-sm">
+            {HORIZON_GRADES.map((h) => (
+              <li key={h.name}>
+                <span className="font-medium">{h.name}</span>
+                <span className="block text-xs text-muted mt-0.5 leading-relaxed">{h.how}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-center">
+            {[["A", "75점↑"], ["B", "60~74"], ["C", "45~59"], ["D", "45 미만"]].map(([g, r]) => (
+              <div key={g} className="rounded-lg border border-line py-2"><b className="text-base">{g}</b><br /><span className="text-muted num">{r}</span></div>
+            ))}
+          </div>
+        </Section>
+      </div>
 
       <Section title="종목 선별 체크리스트">
         <div className="overflow-x-auto -mx-4 sm:-mx-5">

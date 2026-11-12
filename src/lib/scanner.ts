@@ -5,6 +5,7 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { computeSnapshot, summarize } from "./analysis";
+import type { HorizonGrade } from "./grades";
 import { autoFinal, buildInsight } from "./insight";
 import { koreanName } from "./naver";
 import { activeSymbols, selectTop } from "./ranking";
@@ -265,6 +266,8 @@ async function sparkBatch(symbols: string[]): Promise<Map<string, { bars: Bar[];
 const PICK_MIN_PRICE = 3;
 const PICK_MIN_DV = 2_000_000; // 당일 거래대금 200만 달러 이상
 
+const pickGrade = (g: HorizonGrade) => ({ grade: g.grade, label: g.label, tone: g.tone, expected: g.expected });
+
 async function buildPick(row: ScanRow): Promise<Pick | null> {
   const chart = await fetchChart(row.symbol, "2y");
   const ins = await buildInsight(row.symbol, chart);
@@ -304,7 +307,9 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
     tags: ins.drop.tagCounts.filter((t) => t.kind !== "positive").map((t) => ({ label: t.label, kind: t.kind })),
     fromHigh3m: ins.drop.fromHigh3m,
     fairValue: r.fairValue,
-    analystCount: f?.analystCount ?? null,
+    shortGrade: pickGrade(ins.grades.short),
+    longGrade: pickGrade(ins.grades.long),
+    resilienceSummary: ins.resilience.summary,
   };
 }
 

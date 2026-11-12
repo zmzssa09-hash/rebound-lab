@@ -26,6 +26,7 @@ const SHORT: Record<string, string> = {
   discount: "할인",
   balance: "재무",
   technical: "과매도",
+  resilience: "회복",
   catalyst: "촉매",
   downside: "안전",
 };
@@ -232,10 +233,31 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
         <RsiChip value={rsi} />
         {upside != null && (
           <span className="text-muted text-xs">
-            목표가 ${p.fairValue!.toFixed(2)} (<span className={toneOf(upside)}>{pct(upside, 0)}</span>)
+            적정가 ${p.fairValue!.toFixed(2)} (<span className={toneOf(upside)}>{pct(upside, 0)}</span>)
           </span>
         )}
       </div>
+
+      {/* 단기·장기 등급 */}
+      {p.shortGrade && p.longGrade && (
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          {[
+            { k: "단기 1~4주", g: p.shortGrade },
+            { k: "장기 3~12개월", g: p.longGrade },
+          ].map(({ k, g }) => (
+            <div key={k} className={`rounded-lg border px-2.5 py-2 ${TONE_CLASS[g.tone]}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-text leading-none">{g.grade}</span>
+                <div className="min-w-0">
+                  <div className="text-[10px] opacity-80">{k}</div>
+                  <div className="text-xs font-medium truncate">{g.label}</div>
+                </div>
+              </div>
+              <div className="text-[10px] text-text/75 mt-1 leading-snug">{g.expected}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1.5 mt-2">
         <span className={`rounded-full border px-2 py-0.5 text-[11px] ${TONE_CLASS[p.gradeTone]}`}>{p.grade}</span>
@@ -248,7 +270,7 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
         )}
       </div>
 
-      <div className="grid grid-cols-6 gap-1.5 mt-3">
+      <div className="grid grid-cols-7 gap-1 mt-3">
         {SCORE_ITEMS.map((it) => {
           const v = p.scores[it.key];
           const f = v != null ? (v / it.max) * 100 : 0;
@@ -272,6 +294,11 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
         <ul className="mt-2 space-y-1 text-xs text-text/85 leading-relaxed">
           {p.dropBullets.slice(1, 4).map((b) => <li key={b}>• {b}</li>)}
         </ul>
+        {p.resilienceSummary && (
+          <div className="mt-2 pt-2 border-t border-line text-xs">
+            <span className="font-medium">과거 회복력</span> <span className="text-text/80">{p.resilienceSummary}</span>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center mt-3">

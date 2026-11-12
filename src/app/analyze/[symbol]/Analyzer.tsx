@@ -12,6 +12,7 @@ import { exchangeKo, typeKo } from "@/lib/ko";
 import { etpKind } from "@/lib/strategy";
 import { useChart, useInsight } from "@/lib/useQuotes";
 import DropReasonPanel from "@/components/DropReasonPanel";
+import { GradeBoxes, ResiliencePanel, ValuationPanel } from "@/components/ValuationPanel";
 
 export default function Analyzer({ symbol }: { symbol: string }) {
   const { data, error, loading } = useChart(symbol);
@@ -111,6 +112,9 @@ export default function Analyzer({ symbol }: { symbol: string }) {
         </p>
       </div>
 
+      {/* 단기·장기 등급 */}
+      <GradeBoxes grades={insight.data?.grades ?? null} loading={insight.loading} />
+
       {/* 하락 이유 */}
       <DropReasonPanel
         drop={insight.data?.drop ?? null}
@@ -204,6 +208,11 @@ export default function Analyzer({ symbol }: { symbol: string }) {
             </div>
           )}
         </Section>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2 items-start">
+        <ValuationPanel v={insight.data?.valuation ?? null} price={snap.price} />
+        <ResiliencePanel r={insight.data?.resilience ?? null} />
       </div>
 
       <Scorecard symbol={symbol} snap={snap} auto={insight.data?.auto ?? null} />

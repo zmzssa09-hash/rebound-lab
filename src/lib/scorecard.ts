@@ -1,7 +1,9 @@
 // 종목 평가표 (100점 만점)
 // 배점 기준이며 실제 점수는 재무·시세 자료를 확인한 뒤 산정한다.
 import type { DropAnalysis } from "./dropReason";
+import type { Resilience } from "./resilience";
 import type { Fundamentals, Snapshot, Tone } from "./types";
+import { MODEL_NAME, type Valuation } from "./valuation";
 
 export interface Band {
   range: string;
@@ -31,9 +33,9 @@ export const SCORE_ITEMS: ScoreItem[] = [
   },
   {
     key: "discount",
-    label: "적정가치 대비 할인율",
+    label: "적정가 대비 할인율",
     max: 25,
-    guide: "적정가치(기본: 애널리스트 평균 목표가, 직접 입력 가능) 대비 현재가 할인율",
+    guide: "이중 투자전략 적정가 모델 1.0(DCF 40%·상대가치 30%·성장성 20%·위험 조정 10%) 대비 현재가 할인율",
     bands: [
       { range: "25", text: "40% 이상 할인" },
       { range: "22", text: "30~40% 할인" },
@@ -59,22 +61,34 @@ export const SCORE_ITEMS: ScoreItem[] = [
   {
     key: "technical",
     label: "기술적 과매도 신호",
-    max: 15,
+    max: 10,
     guide: "RSI 수준 + 안정 신호(MACD 개선·매도 거래량 진정·저점 유지)",
     bands: [
-      { range: "RSI", text: "25 이하 7점 · 30 이하 6점 · 35 이하 3점" },
-      { range: "안정 신호", text: "개당 3점 (최대 9점) — RSI 40 이하일 때만 인정" },
+      { range: "RSI", text: "25 이하 4점 · 30 이하 3점 · 35 이하 2점" },
+      { range: "안정 신호", text: "개당 2점 (최대 6점) — RSI 40 이하일 때만 인정" },
+    ],
+  },
+  {
+    key: "resilience",
+    label: "과거 회복탄력성",
+    max: 10,
+    guide: "최근 10년간 이 종목이 과매도(RSI ≤ 30)에 빠졌을 때 얼마나, 얼마나 빨리 회복했는가",
+    bands: [
+      { range: "회복 비율", text: "60거래일 안에 하락 전 고점 회복: 70%↑ 4점 · 50%↑ 3점 · 30%↑ 2점" },
+      { range: "회복 속도", text: "회복 기간 중앙값: 20거래일 이내 3점 · 40일 2점 · 60일 1점" },
+      { range: "4주 승률", text: "과매도 4주 뒤 플러스 확률: 60%↑ 3점 · 50%↑ 2점 · 40%↑ 1점" },
+      { range: "사례 부족", text: "과거 사례 2회 미만이면 중립 5점" },
     ],
   },
   {
     key: "catalyst",
     label: "향후 상승 촉매",
-    max: 10,
-    guide: "다가오는 실적 발표, 애널리스트 의견, 목표가 여력, 호재 뉴스",
+    max: 5,
+    guide: "다가오는 실적 발표, 호재 뉴스, 업종 흐름 (애널리스트 의견은 사용하지 않음)",
     bands: [
-      { range: "8~10", text: "시점이 구체적인 촉매가 있음" },
-      { range: "4~7", text: "가능성은 있지만 시점이 불확실" },
-      { range: "0~3", text: "뚜렷한 촉매가 없음" },
+      { range: "4~5", text: "시점이 구체적인 촉매가 있음" },
+      { range: "2~3", text: "가능성은 있지만 시점이 불확실" },
+      { range: "0~1", text: "뚜렷한 촉매가 없음" },
     ],
   },
   {
@@ -119,21 +133,21 @@ export function technicalScore(s: Snapshot): { score: number; parts: string[] } 
   const parts: string[] = [];
   if (s.rsi == null) return { score: 0, parts: ["RSI 데이터 부족"] };
   let score = 0;
-  if (s.rsi <= 25) score += 7;
-  else if (s.rsi <= 30) score += 6;
-  else if (s.rsi <= 35) score += 3;
+  if (s.rsi <= 25) score += 4;
+  else if (s.rsi <= 30) score += 3;
+  else if (s.rsi <= 35) score += 2;
   parts.push(`RSI ${s.rsi.toFixed(1)} → ${score}점`);
   if (s.rsi <= 40) {
     const macd = s.macdCrossDaysAgo != null || (s.macdHist != null && s.macdHistPrev != null && s.macdHist > s.macdHistPrev);
     const vol = s.downDayVolRatio != null && s.downDayVolRatio <= 0.9;
     const support = s.low3m != null && s.priorLow3m != null && s.low3m >= s.priorLow3m;
     const stab = [macd, vol, support].filter(Boolean).length;
-    score += stab * 3;
-    parts.push(`안정 신호 ${stab}/3 (MACD ${macd ? "○" : "×"} · 거래량 ${vol ? "○" : "×"} · 저점 ${support ? "○" : "×"}) → ${stab * 3}점`);
+    score += stab * 2;
+    parts.push(`안정 신호 ${stab}/3 (MACD ${macd ? "○" : "×"} · 거래량 ${vol ? "○" : "×"} · 저점 ${support ? "○" : "×"}) → ${stab * 2}점`);
   } else {
     parts.push("RSI 40 초과 — 과매도 신호 없음");
   }
-  return { score: Math.min(score, 15), parts };
+  return { score: Math.min(score, 10), parts };
 }
 
 // ───────── 자동 채점 (재무 데이터 기반, 직접 수정 가능) ─────────
@@ -158,7 +172,9 @@ const usd = (v: number) => {
 export function autoScore(
   f: Fundamentals | null,
   snap: Snapshot,
-  drop: Pick<DropAnalysis, "tagCounts" | "suggestedFlags"> | null,
+  drop: Pick<DropAnalysis, "tagCounts" | "suggestedFlags" | "nature" | "sector"> | null,
+  valuation: Valuation | null,
+  res: Resilience | null,
 ): AutoScore {
   const reasons: Record<string, string[]> = {};
   const scores: Record<string, number | null> = {};
@@ -168,15 +184,18 @@ export function autoScore(
   scores.technical = tech.score;
   reasons.technical = tech.parts;
 
-  const fairValue = f?.targetMean && (f.analystCount ?? 0) >= 3 ? f.targetMean : null;
+  scores.resilience = res ? res.score : 5;
+  reasons.resilience = res ? res.scoreParts : ["과거 가격 데이터를 받지 못해 중립 5점"];
+
+  const fairValue = valuation?.fairValue ?? null;
   const disc = discountOf(snap.price, fairValue);
   scores.discount = discountScore(disc);
   reasons.discount = fairValue
     ? [
-        `애널리스트 ${f!.analystCount}명 평균 목표가 $${fairValue.toFixed(2)} 기준 ${disc! >= 0 ? `${disc!.toFixed(1)}% 할인` : `${(-disc!).toFixed(1)}% 고평가`}`,
-        "목표가는 낙관적일 수 있으니 직접 계산한 적정가치로 바꿔 넣을 수 있습니다.",
+        `${MODEL_NAME} 적정가 $${fairValue.toFixed(2)} 기준 ${disc! >= 0 ? `${disc!.toFixed(1)}% 할인` : `${(-disc!).toFixed(1)}% 고평가`}`,
+        "계산 근거는 ‘적정가 계산’ 패널에서 확인할 수 있고, 직접 계산한 적정가로 바꿔 넣을 수도 있습니다.",
       ]
-    : ["애널리스트 목표가가 부족합니다. 적정가치를 직접 입력하세요."];
+    : ["적정가를 계산할 재무 데이터가 부족합니다. 적정가를 직접 입력하세요."];
 
   const suspectsFromNews = (exclude: AutoScore["flags"]) => {
     const out: AutoScore["suspects"] = {};
@@ -189,7 +208,7 @@ export function autoScore(
       scores[k] = null;
       reasons[k] = ["재무 데이터를 받지 못했습니다. 직접 채점하세요."];
     }
-    return { scores, reasons, fairValue, fairValueSource: null, flags: {}, suspects: suspectsFromNews({}) };
+    return { scores, reasons, fairValue, fairValueSource: fairValue ? MODEL_NAME : null, flags: {}, suspects: suspectsFromNews({}) };
   }
 
   // 실적 및 성장성 (25)
@@ -263,39 +282,30 @@ export function autoScore(
     reasons.balance = r;
   }
 
-  // 향후 상승 촉매 (10) — 참고용 추정
+  // 향후 상승 촉매 (5) — 애널리스트 의견 없이 일정·뉴스·업종 흐름만 사용
   {
     const r: string[] = [];
     let s = 0;
     const now = Date.now() / 1000;
     if (f.earningsDate && f.earningsDate > now && f.earningsDate - now < 75 * 86400) {
-      s += 3;
-      r.push(`다음 실적 발표 ${new Date(f.earningsDate * 1000).toLocaleDateString("ko-KR")} (75일 이내) → +3`);
-    }
-    if (f.recommendationMean != null && (f.analystCount ?? 0) >= 3) {
-      if (f.recommendationMean <= 2) {
-        s += 3;
-        r.push(`애널리스트 평균 의견 ‘매수’ (${f.recommendationMean.toFixed(1)}점, 1=강력매수) → +3`);
-      } else if (f.recommendationMean <= 2.5) {
-        s += 2;
-        r.push(`애널리스트 평균 의견 ‘매수~보유’ (${f.recommendationMean.toFixed(1)}점) → +2`);
-      }
-    }
-    if (disc != null && disc >= 30) {
       s += 2;
-      r.push("평균 목표가까지 상승 여력 30% 이상 → +2");
+      r.push(`다음 실적 발표 ${new Date(f.earningsDate * 1000).toLocaleDateString("ko-KR")} (75일 이내) → +2`);
     }
     if (tags.has("positive")) {
       s += 1;
       r.push("최근 뉴스에 호재 → +1");
     }
-    if ((f.analystCount ?? 0) >= 5) {
+    if (drop?.nature === "external") {
       s += 1;
-      r.push(`커버하는 애널리스트 ${f.analystCount}명 → +1`);
+      r.push("시장·업종 탓 하락 → 시장 회복 시 함께 반등 여지 +1");
+    }
+    if (drop?.sector?.ret1m != null && drop.sector.ret1m > 0) {
+      s += 1;
+      r.push(`${drop.sector.label} 최근 1개월 ${drop.sector.ret1m.toFixed(1)}% 상승 (업종 흐름 우호) → +1`);
     }
     if (!r.length) r.push("자동으로 확인된 촉매 없음");
     r.push("신제품·허가·보험급여 같은 구체적 촉매는 직접 확인해 점수를 조정하세요.");
-    scores.catalyst = clamp(s, 0, 10);
+    scores.catalyst = clamp(s, 0, 5);
     reasons.catalyst = r;
   }
 
@@ -344,7 +354,7 @@ export function autoScore(
     scores,
     reasons,
     fairValue,
-    fairValueSource: fairValue ? `애널리스트 ${f.analystCount}명 평균 목표가` : null,
+    fairValueSource: fairValue ? MODEL_NAME : null,
     flags,
     suspects: suspectsFromNews(flags),
   };

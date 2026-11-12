@@ -177,8 +177,10 @@ export interface Pick {
   dropBullets: string[];
   tags: PickTag[];
   fromHigh3m: number;
-  fairValue: number | null;
-  analystCount: number | null;
+  fairValue: number | null; // 이중 투자전략 적정가 모델 1.0
+  shortGrade: { grade: string; label: string; tone: Tone; expected: string };
+  longGrade: { grade: string; label: string; tone: Tone; expected: string };
+  resilienceSummary: string;
   // 순위 추적 (Top 10에 든 종목만)
   rank?: number;
   prevRank?: number | null; // 직전 분석 때 순위 (없으면 신규)
@@ -226,12 +228,12 @@ export interface Fundamentals {
   forwardPE: number | null;
   evToEbitda: number | null;
   evToRevenue: number | null;
-  targetMean: number | null;
-  targetLow: number | null;
-  targetHigh: number | null;
-  analystCount: number | null;
-  recommendationMean: number | null; // 1 강력매수 ~ 5 매도
-  recommendationKey: string | null;
+  financialCurrency: string | null; // 재무제표 통화 (ADR은 현지 통화일 수 있음)
+  sharesOutstanding: number | null;
+  enterpriseValue: number | null;
+  ebitda: number | null;
+  forwardEps: number | null;
+  trailingEps: number | null;
   shortPercentFloat: number | null;
   beta: number | null;
   earningsDate: number | null; // 가장 최근 또는 다음 실적 발표 (UNIX초)

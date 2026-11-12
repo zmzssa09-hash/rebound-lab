@@ -1,4 +1,4 @@
-// 서버 전용: Yahoo quoteSummary(재무·애널리스트·일정) + 종목 뉴스
+// 서버 전용: Yahoo quoteSummary(재무·일정·업종) + 종목 뉴스 + 비교 기업
 // 서버에서만 사용 (instrumentation 스케줄러에서도 불러오므로 server-only 표시는 쓰지 않음)
 import type { Fundamentals, NewsItem } from "./types";
 
@@ -8,13 +8,13 @@ const TTL_MS = 6 * 60 * 60 * 1000;
 // ───────── crumb 인증 ─────────
 
 const g = globalThis as unknown as {
-  __yf?: {
+  __yf3?: {
     auth: { cookie: string; crumb: string; at: number } | null;
     fund: Map<string, { at: number; data: Fundamentals | null }>;
     news: Map<string, { at: number; data: NewsItem[] }>;
   };
 };
-const C = (g.__yf ??= { auth: null, fund: new Map(), news: new Map() });
+const C = (g.__yf3 ??= { auth: null, fund: new Map(), news: new Map() });
 
 async function getAuth(force = false) {
   if (!force && C.auth && Date.now() - C.auth.at < 6 * 60 * 60 * 1000) return C.auth;
@@ -101,12 +101,13 @@ export async function getFundamentals(symbol: string): Promise<Fundamentals | nu
     forwardPE: n(ks.forwardPE) ?? n(sd.forwardPE),
     evToEbitda: n(ks.enterpriseToEbitda),
     evToRevenue: n(ks.enterpriseToRevenue),
-    targetMean: n(fd.targetMeanPrice),
-    targetLow: n(fd.targetLowPrice),
-    targetHigh: n(fd.targetHighPrice),
-    analystCount: n(fd.numberOfAnalystOpinions),
-    recommendationMean: n(fd.recommendationMean),
-    recommendationKey: typeof fd.recommendationKey === "string" ? fd.recommendationKey : null,
+    // 애널리스트 목표가·투자의견은 사용하지 않음 (자체 적정가 모델 사용)
+    financialCurrency: typeof fd.financialCurrency === "string" ? fd.financialCurrency : null,
+    sharesOutstanding: n(ks.sharesOutstanding) ?? n(ks.impliedSharesOutstanding),
+    enterpriseValue: n(ks.enterpriseValue),
+    ebitda: n(fd.ebitda),
+    forwardEps: n(ks.forwardEps),
+    trailingEps: n(ks.trailingEps),
     shortPercentFloat: n(ks.shortPercentOfFloat),
     beta: n(ks.beta) ?? n(sd.beta),
     earningsDate: n(earn[0]),
@@ -117,6 +118,30 @@ export async function getFundamentals(symbol: string): Promise<Fundamentals | nu
   C.fund.set(sym, { at: Date.now(), data });
   if (C.fund.size > 3000) C.fund.delete(C.fund.keys().next().value as string);
   return data;
+}
+
+/** 동종업계 비교 기업 (야후 유사 종목 → 같은 업종의 미국 상장 기업만, 최대 6개) */
+export async function getPeers(symbol: string, sector: string | null): Promise<Fundamentals[]> {
+  const sym = symbol.toUpperCase();
+  let peers: string[] = [];
+  try {
+    const res = await fetch(`https://query2.finance.yahoo.com/v6/finance/recommendationsbysymbol/${encodeURIComponent(sym)}`, {
+      headers: { "User-Agent": UA },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const j = (await res.json()) as { finance?: { result?: { recommendedSymbols?: { symbol: string }[] }[] } };
+      peers = (j.finance?.result?.[0]?.recommendedSymbols ?? [])
+        .map((x) => x.symbol.toUpperCase())
+        .filter((s) => /^[A-Z][A-Z0-9-]{0,9}$/.test(s) && s !== sym); // 점(.)이 붙은 해외 종목 제외
+    }
+  } catch {
+    return [];
+  }
+  const fs = await Promise.all(peers.slice(0, 8).map((s) => getFundamentals(s).catch(() => null)));
+  return fs
+    .filter((f): f is Fundamentals => !!f && (!sector || f.sector === sector) && !/korea/i.test(f.country ?? ""))
+    .slice(0, 6);
 }
 
 export async function getNews(symbol: string, count = 15): Promise<NewsItem[]> {

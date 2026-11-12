@@ -117,11 +117,8 @@ export default function DropReasonPanel({
               <dd className="text-right">{bigMoneyKo(f.cash)} / {bigMoneyKo(f.debt)}</dd>
               <dt className="text-muted">선행 PER</dt>
               <dd className="text-right">{f.forwardPE != null ? f.forwardPE.toFixed(1) : "–"}</dd>
-              <dt className="text-muted">애널리스트 목표가</dt>
-              <dd className="text-right">
-                {f.targetMean != null ? `$${f.targetMean.toFixed(2)}` : "–"}
-                {f.analystCount ? <span className="text-muted text-xs"> ({f.analystCount}명)</span> : null}
-              </dd>
+              <dt className="text-muted">EV/EBITDA</dt>
+              <dd className="text-right">{f.evToEbitda != null ? `${f.evToEbitda.toFixed(1)}배` : "–"}</dd>
               <dt className="text-muted">공매도 비율</dt>
               <dd className="text-right">{f.shortPercentFloat != null ? `${(f.shortPercentFloat * 100).toFixed(1)}%` : "–"}</dd>
               <dt className="text-muted">실적 발표일</dt>
