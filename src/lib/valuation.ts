@@ -55,6 +55,33 @@ const SECTOR_DEFAULT: Record<string, { evs: number; eve: number; pe: number }> =
   "Real Estate": { evs: 7, eve: 17, pe: 30 },
 };
 
+/** 적정가 상한: 현재가 대비 +100% (반등 전략에서 현실적인 목표 범위) */
+export const MAX_UPSIDE = 1.0;
+/** 매출 성장률이 이보다 크면 일회성(라이선스 수익 등) 급증으로 본다 */
+const SPIKE_GROWTH = 1.0;
+
+/**
+ * 이익 전망: 내년 예상 EPS ÷ 최근 12개월 EPS.
+ *  - "collapse": 내년 예상 이익이 적자 → 최근 이익이 일회성일 가능성
+ *  - "decline": 이익이 30% 이상 줄어들 전망
+ */
+function earningsOutlook(f: Fundamentals): { kind: "ok" | "decline" | "collapse"; ratio: number | null } {
+  const t = f.trailingEps, fw = f.forwardEps;
+  if (t == null || fw == null || t <= 0) return { kind: "ok", ratio: null };
+  if (fw <= 0) return { kind: "collapse", ratio: fw / t };
+  const ratio = fw / t;
+  return { kind: ratio < 0.7 ? "decline" : "ok", ratio };
+}
+
+/** 성장률 정규화: 일회성 급증은 성장으로 보지 않고, 이익 감소 전망이면 성장 가정을 낮춘다 */
+function sustainableGrowth(f: Fundamentals): { g: number; note: string | null } {
+  const rg = f.revenueGrowth ?? 0.03;
+  const out = earningsOutlook(f);
+  if (rg > SPIKE_GROWTH) return { g: 0.05, note: `매출 성장률 ${pct(rg)}는 일회성 급증으로 보고 5%로 보수 적용` };
+  if (out.kind !== "ok") return { g: Math.min(rg, 0.03), note: "이익 감소 전망이라 성장률을 3% 이하로 제한" };
+  return { g: rg, note: null };
+}
+
 function netCash(f: Fundamentals) {
   return (f.cash ?? 0) - (f.debt ?? 0);
 }
@@ -72,11 +99,23 @@ function dcf(f: Fundamentals): ValuationPart {
     part.detail.push(`잉여현금흐름(FCF) ${fcf == null ? "데이터 없음" : `${usd(fcf)} 적자`} — DCF 적용 불가, 나머지 항목으로 계산`);
     return part;
   }
-  const g0 = clamp(f.revenueGrowth ?? 0.03, -0.05, 0.25);
+  const out = earningsOutlook(f);
+  if (out.kind === "collapse") {
+    part.detail.push(
+      `최근 12개월 EPS ${f.trailingEps!.toFixed(2)} → 내년 예상 EPS ${f.forwardEps!.toFixed(2)} (적자 전환 전망)`,
+      "최근 현금흐름이 일회성일 가능성이 커서 DCF 적용 불가",
+    );
+    return part;
+  }
+  // 이익 감소 전망이면 기준 현금흐름을 예상 이익 비율만큼 낮춘다
+  const fcf0 = fcf;
+  const fcfBase = out.kind === "decline" ? fcf * Math.max(out.ratio!, 0.2) : fcf;
+  const sg = sustainableGrowth(f);
+  const g0 = clamp(sg.g, -0.05, 0.15);
   const gT = 0.025;
   const beta = clamp(f.beta ?? 1, 0.6, 2.5);
   const r = clamp(0.07 + beta * 0.025, 0.08, 0.12); // 기본 7% + 베타 × 2.5% (8~12% 범위)
-  let cf = fcf;
+  let cf = fcfBase;
   let pv = 0;
   for (let y = 1; y <= 10; y++) {
     // 1~5년: 현재 성장률 → 3%로 수렴, 6~10년: 3% → 2.5%
@@ -88,8 +127,11 @@ function dcf(f: Fundamentals): ValuationPart {
   const pvTv = tv / (1 + r) ** 10;
   const equity = pv + pvTv + netCash(f);
   part.detail.push(
-    `기준 FCF ${usd(fcf)} (최근 12개월)`,
-    `성장률: ${pct(g0)}에서 5년간 3%로 수렴 → 10년차 2.5% (영구성장)`,
+    out.kind === "decline"
+      ? `기준 FCF ${usd(fcfBase)} = 최근 12개월 ${usd(fcf0)} × 예상 이익 비율 ${(out.ratio! * 100).toFixed(0)}% (내년 이익 감소 전망 반영)`
+      : `기준 FCF ${usd(fcf)} (최근 12개월)`,
+    ...(sg.note ? [sg.note] : []),
+    `성장률: ${pct(g0)}(최대 15%)에서 5년간 3%로 수렴 → 10년차 2.5% (영구성장)`,
     `할인율 ${pct(r)} (기본 7% + 베타 ${beta.toFixed(2)} × 2.5%)`,
     `현금흐름 현재가치 ${usd(pv)} + 잔존가치 ${usd(pvTv)} + 순현금 ${usd(netCash(f))} = 주주가치 ${usd(equity)}`,
   );
@@ -110,14 +152,17 @@ function peerValue(f: Fundamentals, peers: Fundamentals[]): ValuationPart {
     return part;
   }
   const evs = median(peers.map((p) => p.evToRevenue).filter((v): v is number => v != null && v > 0 && v < 50));
-  const eve = median(peers.map((p) => p.evToEbitda).filter((v): v is number => v != null && v > 0 && v < 80));
-  const pe = median(peers.map((p) => p.forwardPE).filter((v): v is number => v != null && v > 0 && v < 100));
+  // 0~3배 같은 비정상 배수(적자·특수 상황 기업)는 제외
+  const eve = median(peers.map((p) => p.evToEbitda).filter((v): v is number => v != null && v >= 3 && v < 80));
+  const pe = median(peers.map((p) => p.forwardPE).filter((v): v is number => v != null && v >= 5 && v < 100));
   const def = f.sector ? SECTOR_DEFAULT[f.sector] : undefined;
   const usePeers = peers.length >= 2;
+  // 비교 기업 배수는 업종 기본값의 0.5~1.75배 범위로 제한 (고성장주 몇 곳에 끌려가지 않게)
+  const bound = (v: number | null, d: number | undefined) => (v == null ? d ?? null : d ? clamp(v, d * 0.5, d * 1.75) : v);
   const m = {
-    evs: usePeers && evs != null ? evs : def?.evs ?? null,
-    eve: usePeers && eve != null ? eve : def?.eve ?? null,
-    pe: usePeers && pe != null ? pe : def?.pe ?? null,
+    evs: usePeers ? bound(evs, def?.evs) : def?.evs ?? null,
+    eve: usePeers ? bound(eve, def?.eve) : def?.eve ?? null,
+    pe: usePeers ? bound(pe, def?.pe) : def?.pe ?? null,
   };
   part.detail.push(
     usePeers
@@ -125,8 +170,15 @@ function peerValue(f: Fundamentals, peers: Fundamentals[]): ValuationPart {
       : `비교 기업 부족 — ${f.sector ?? "업종"} 기본 배수(참고값) 사용`,
   );
   // 이익을 내는 기업은 이익 기반 배수(EV/EBITDA·선행 PER)를 우선, 매출 배수는 이익이 없을 때만 사용
+  const out = earningsOutlook(f);
+  if (out.kind === "collapse") {
+    part.detail.push("내년 예상 이익이 적자 전환 — 최근 실적(EBITDA·매출)이 일회성일 수 있어 상대가치 적용 불가");
+    return part;
+  }
   const implied: number[] = [];
-  if (m.eve != null && f.ebitda && f.ebitda > 0) {
+  if (out.kind === "decline") {
+    part.detail.push("이익 감소 전망 — 지난 12개월 EBITDA 대신 내년 예상 이익(선행 PER)만 사용");
+  } else if (m.eve != null && f.ebitda && f.ebitda > 0) {
     const v = (m.eve * f.ebitda + netCash(f)) / shares;
     if (v > 0) implied.push(v);
     part.detail.push(`EV/EBITDA ${m.eve.toFixed(1)}배 × EBITDA ${usd(f.ebitda)} → $${v.toFixed(2)}`);
@@ -157,13 +209,19 @@ function growthValue(f: Fundamentals): ValuationPart {
     part.detail.push("매출·주식 수 데이터 없음 — 계산 불가");
     return part;
   }
-  const rg = f.revenueGrowth ?? 0;
+  if (earningsOutlook(f).kind !== "ok") {
+    part.detail.push("내년 이익 감소(또는 적자 전환) 전망 — 성장성 가치는 적용하지 않음");
+    return part;
+  }
+  const sg = sustainableGrowth(f);
+  const rg = clamp(sg.g, -0.5, 0.3); // 성장 가점은 30%까지만
   const gm = f.grossMargin ?? 0.3;
   const om = f.operatingMargin ?? 0;
-  const fair = clamp(0.8 + 12 * Math.max(rg, 0) + 3 * Math.max(gm, 0) + 5 * Math.max(om, 0) - (rg < 0 ? 4 * -rg : 0), 0.4, 15);
+  const fair = clamp(0.8 + 12 * Math.max(rg, 0) + 3 * Math.max(gm, 0) + 5 * Math.max(om, 0) - (rg < 0 ? 4 * -rg : 0), 0.4, 10);
   part.value = (fair * f.revenue + netCash(f)) / f.sharesOutstanding;
   part.detail.push(
-    `매출 성장률 ${pct(rg)}, 총이익률 ${pct(gm)}(경쟁력·가격결정력), 영업이익률 ${pct(om)}`,
+    ...(sg.note ? [sg.note] : []),
+    `반영 성장률 ${pct(rg)}(최대 30%), 총이익률 ${pct(gm)}(경쟁력·가격결정력), 영업이익률 ${pct(om)}`,
     `적정 EV/매출 = 0.8 + 12×성장률 + 3×총이익률 + 5×영업이익률 = ${fair.toFixed(2)}배`,
     `× 매출 ${usd(f.revenue)} + 순현금 ${usd(netCash(f))} → $${part.value.toFixed(2)}`,
   );
@@ -224,13 +282,13 @@ export function fairValueModel(f: Fundamentals | null, peers: Fundamentals[], pr
   }
   peers = peers.filter((p) => !p.financialCurrency || p.financialCurrency === "USD");
   const base = [dcf(f), peerValue(f, peers), growthValue(f)];
-  // 성장성 항목이 과도하게 튀지 않도록: DCF·상대가치 평균의 2배를 상한으로
+  // 성장성 항목이 과도하게 튀지 않도록: DCF·상대가치 평균의 1.5배를 상한으로
   const anchors = base.slice(0, 2).map((p) => p.value).filter((v): v is number => v != null && v > 0);
   const gp = base[2];
   if (anchors.length && gp.value != null) {
-    const cap = (2 * anchors.reduce((a, b) => a + b, 0)) / anchors.length;
+    const cap = (1.5 * anchors.reduce((a, b) => a + b, 0)) / anchors.length;
     if (gp.value > cap) {
-      gp.detail.push(`DCF·상대가치 평균의 2배($${cap.toFixed(2)})를 넘어 상한 적용`);
+      gp.detail.push(`DCF·상대가치 평균의 1.5배($${cap.toFixed(2)})를 넘어 상한 적용`);
       gp.value = cap;
     }
   }
@@ -239,7 +297,7 @@ export function fairValueModel(f: Fundamentals | null, peers: Fundamentals[], pr
   const risk = riskMultiplier(f, fundamentalDrop);
 
   if (!avail.length) {
-    return { fairValue: null, parts: [...base], usedWeight: 0, upside: null, riskMultiplier: risk.mult, notes: ["계산 가능한 가치 항목이 없습니다."] };
+    return { fairValue: null, parts: [...base], usedWeight: 0, upside: null, riskMultiplier: risk.mult, notes: [earningsOutlook(f).kind === "collapse" ? "내년 예상 이익이 적자로 전환될 전망이라 최근 실적이 일회성일 가능성이 큽니다 — 적정가를 계산하지 않습니다." : "계산 가능한 가치 항목이 없습니다."] };
   }
   const baseW = avail.reduce((a, p) => a + p.weight, 0);
   const baseValue = avail.reduce((a, p) => a + p.weight * p.value!, 0) / baseW;
@@ -253,7 +311,20 @@ export function fairValueModel(f: Fundamentals | null, peers: Fundamentals[], pr
   const parts = [...base, riskPart];
   const used = parts.filter((p) => p.value != null && p.value > 0);
   const usedWeight = used.reduce((a, p) => a + p.weight, 0);
-  const fairValue = used.reduce((a, p) => a + p.weight * p.value!, 0) / usedWeight;
+  const modelValue = used.reduce((a, p) => a + p.weight * p.value!, 0) / usedWeight;
+  const capValue = price > 0 ? price * (1 + MAX_UPSIDE) : Infinity;
+  const fairValue = Math.min(modelValue, capValue);
+  if (modelValue > capValue) {
+    notes.push(`모델 계산값 ${modelValue.toFixed(2)}이(가) 현재가의 2배를 넘어 +${MAX_UPSIDE * 100}% 상한(${capValue.toFixed(2)})을 적용했습니다. 반등 목표로는 이 범위가 현실적입니다.`);
+  }
+  const out = earningsOutlook(f);
+  if (out.kind !== "ok") {
+    notes.push(
+      out.kind === "collapse"
+        ? "내년 예상 이익이 적자로 전환될 전망입니다 — 최근 실적이 일회성일 수 있어 보수적으로 계산했습니다."
+        : `내년 예상 이익이 최근 12개월보다 ${Math.round((1 - out.ratio!) * 100)}% 적을 전망이라 현금흐름 가치를 낮췄습니다.`,
+    );
+  }
   if (usedWeight < 0.999) notes.push(`계산 불가 항목을 제외하고 나머지 비중(${Math.round(usedWeight * 100)}%)으로 다시 나눴습니다.`);
   notes.push("가정에 민감한 참고 시나리오입니다. 보장된 적정가가 아닙니다.");
   return { fairValue, parts, usedWeight, upside: ((fairValue - price) / price) * 100, riskMultiplier: risk.mult, notes };

@@ -121,7 +121,7 @@ export default function StrategyPage() {
           <ul className="space-y-3 text-sm">
             {FAIR_VALUE_MODEL.map((m) => (
               <li key={m.label} className="flex gap-3">
-                <span className="num font-semibold text-accent w-10 shrink-0">{m.weight}%</span>
+                <span className="num font-semibold text-accent w-10 shrink-0">{m.weight ? `${m.weight}%` : "상한"}</span>
                 <span>
                   <span className="font-medium">{m.label}</span>
                   <span className="block text-xs text-muted mt-0.5 leading-relaxed">{m.how}</span>
