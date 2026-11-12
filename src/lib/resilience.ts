@@ -12,6 +12,8 @@ export interface Episode {
   ret250: number | null; // 12개월 뒤
   maxDrawdown20: number | null; // 진입 후 4주 내 추가 최대 하락 %
   recoveryDays: number | null; // 하락 직전 고점(직전 20일 최고 종가) 회복까지 거래일 (250일 내 미회복이면 null)
+  upPath: number[]; // 진입 후 1~20거래일 동안 장중 최고가의 누적 최대 상승률 %
+  downPath: number[]; // 진입 후 1~20거래일 동안 장중 최저가의 누적 최대 하락률 % (음수)
 }
 
 export interface Resilience {
@@ -38,6 +40,47 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 const ret = (bars: Bar[], i: number, d: number) => (i + d < bars.length ? ((bars[i + d].close - bars[i].close) / bars[i].close) * 100 : null);
+
+function paths(win: Bar[], entry: number) {
+  const upPath: number[] = [];
+  const downPath: number[] = [];
+  let hi = -Infinity;
+  let lo = Infinity;
+  for (const b of win) {
+    hi = Math.max(hi, b.high);
+    lo = Math.min(lo, b.low);
+    upPath.push(+(((hi - entry) / entry) * 100).toFixed(2));
+    downPath.push(+(((lo - entry) / entry) * 100).toFixed(2));
+  }
+  return { upPath, downPath };
+}
+
+export interface HitStats {
+  n: number; // 판단에 쓴 과거 사례 수
+  hitRate: number | null; // 20거래일 안에 목표 도달 비율
+  firstRate: number | null; // 손절선보다 목표에 먼저 도달한 비율
+  medianDays: number | null; // 도달까지 거래일 중앙값
+}
+
+/** 과거 과매도 사례에서 '진입가 대비 +targetPct%'에 20거래일 안에 도달한 비율 (손절 -stopPct% 보다 먼저인지도) */
+export function hitStats(res: Resilience, targetPct: number, stopPct: number): HitStats {
+  const eps = res.episodes.filter((e) => e.upPath?.length >= 20);
+  if (eps.length < 3) return { n: eps.length, hitRate: null, firstRate: null, medianDays: null };
+  let hit = 0;
+  let first = 0;
+  const days: number[] = [];
+  for (const e of eps) {
+    const t = e.upPath.findIndex((v) => v >= targetPct);
+    const st = e.downPath.findIndex((v) => v <= -stopPct);
+    if (t >= 0) {
+      hit++;
+      days.push(t + 1);
+      // 같은 날 둘 다 닿으면 보수적으로 손절 먼저로 본다
+      if (st < 0 || t < st) first++;
+    }
+  }
+  return { n: eps.length, hitRate: hit / eps.length, firstRate: first / eps.length, medianDays: median(days) };
+}
 
 export function analyzeResilience(bars: Bar[]): Resilience {
   const closes = bars.map((b) => b.close);
@@ -72,6 +115,7 @@ export function analyzeResilience(bars: Bar[]): Resilience {
         ret250: ret(bars, i, 250),
         maxDrawdown20: win.length ? ((Math.min(...win.map((b) => b.low)) - closes[i]) / closes[i]) * 100 : null,
         recoveryDays,
+        ...paths(win, closes[i]),
       });
     }
   }

@@ -13,7 +13,7 @@ export default function AnalyzeIndex() {
     <div>
       <PageHeader
         title="종목 분석"
-        desc="RSI(14)·MACD·이동평균·거래량·지지선을 함께 판정하고, 100점 만점 종목 평가표로 ‘단기 반등에 실패해도 장기 보유할 만한 기업인가’를 점검합니다."
+        desc="RSI(14)·MACD·이동평균·거래량·지지선을 함께 판정하고, 100점 만점 이중 투자전략 평가로 ‘단기 반등에 실패해도 장기 보유할 만한 기업인가’를 점검합니다."
       />
       <div className="card p-5 sm:p-6">
         <SymbolSearch />

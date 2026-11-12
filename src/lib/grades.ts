@@ -1,13 +1,14 @@
-// 단기(1~4주)·장기(3~12개월) 수익 등급
+// 단기(1~4주)·장기(3~12개월) 수익성 평가 — 각각 100점 만점, S+~F 등급
+// 단기 목표가(저항선 기준)와 장기 적정가(가치평가 기준)는 서로 다른 개념이다.
 import type { Resilience } from "./resilience";
+import { letterOf, type LetterGrade } from "./scorecard";
+import type { TradePlan } from "./tradePlan";
 import type { Tone } from "./types";
-
-export type GradeLetter = "A" | "B" | "C" | "D";
 
 export interface HorizonGrade {
   horizon: "short" | "long";
   period: string;
-  grade: GradeLetter;
+  grade: LetterGrade;
   label: string;
   tone: Tone;
   score: number; // 0~100
@@ -15,94 +16,130 @@ export interface HorizonGrade {
   parts: string[];
 }
 
-const letter = (s: number): GradeLetter => (s >= 75 ? "A" : s >= 60 ? "B" : s >= 45 ? "C" : "D");
-const toneOf = (g: GradeLetter): Tone => (g === "A" ? "good" : g === "B" ? "good" : g === "C" ? "warn" : "bad");
+const toneOf = (score: number): Tone => (score >= 70 ? "good" : score >= 55 ? "warn" : "bad");
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const sp = (v: number | null | undefined) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`);
+const pr = (v: number | null) => (v == null ? "–" : `${(v * 100).toFixed(0)}%`);
 
-const NATURE_PTS: Record<string, number> = { external: 15, none: 10, unclear: 10, event: 8, earnings: 5, fundamental: 2 };
+const NATURE_PTS: Record<string, number> = { external: 10, none: 7, unclear: 7, event: 5, earnings: 3, fundamental: 1 };
 
-/** 단기 (1~4주): 기술적 반등 신호 + 과거 과매도 뒤 4주 성과 + 하락 성격 + 변동성 */
+/** 단기 (1~4주): 기술적 분석 25 + 과거 과매도 뒤 4주 성과 25 + 손익비 15 + 1차 목표 도달 확률 15 + 하락 성격 10 + 변동성 10 */
 export function shortGrade(input: {
-  technical: number; // 0~10
+  technical: number; // 0~15
   res: Resilience;
   dropNature: string;
   beta: number | null;
+  plan: TradePlan | null;
+  marketUp: boolean | null; // S&P 500이 200일선 위인가
 }): HorizonGrade {
   const parts: string[] = [];
-  const t = (input.technical / 10) * 30;
-  parts.push(`기술적 과매도·안정 신호 ${input.technical}/10 → ${t.toFixed(0)}/30`);
+  const t = (input.technical / 15) * 25;
+  parts.push(`기술적 분석 ${input.technical}/15 → ${t.toFixed(0)}/25`);
+
   let h: number;
   if (input.res.n >= 2 && input.res.winRate20 != null) {
     const m = clamp(input.res.medianRet20 ?? 0, -10, 15);
-    h = input.res.winRate20 * 25 + ((m + 10) / 25) * 15;
-    parts.push(`과거 과매도 ${input.res.n}회: 4주 뒤 상승 확률 ${(input.res.winRate20 * 100).toFixed(0)}%, 수익 중앙값 ${sp(input.res.medianRet20)} → ${h.toFixed(0)}/40`);
+    h = input.res.winRate20 * 15 + ((m + 10) / 25) * 10;
+    parts.push(`과거 과매도 ${input.res.n}회: 4주 뒤 상승 확률 ${pr(input.res.winRate20)}, 수익 중앙값 ${sp(input.res.medianRet20)} → ${h.toFixed(0)}/25`);
   } else {
-    h = 20;
-    parts.push("과거 과매도 사례 부족 → 중립 20/40");
+    h = 12;
+    parts.push("과거 과매도 사례 부족 → 중립 12/25");
   }
-  const nat = NATURE_PTS[input.dropNature] ?? 8;
-  parts.push(`하락 성격(외부 요인일수록 빠른 반등 기대) → ${nat}/15`);
-  const b = input.beta == null ? 8 : input.beta <= 1.5 ? 15 : input.beta <= 2 ? 10 : 5;
-  parts.push(`변동성(베타 ${input.beta?.toFixed(2) ?? "–"}) → ${b}/15`);
-  const score = Math.round(t + h + nat + b);
-  const g = letter(score);
-  const label = { A: "단기 반등 유력", B: "단기 반등 기대", C: "단기 불확실", D: "단기 비추천" }[g];
+
+  const rr = input.plan?.rr ?? null;
+  const rrPts = rr == null ? 6 : rr >= 3 ? 15 : rr >= 2 ? 12 : rr >= 1.5 ? 9 : rr >= 1 ? 5 : 1;
+  parts.push(rr == null ? "손익비 계산 불가 → 6/15" : `손익비 ${rr.toFixed(1)} (1차 목표까지 상승폭 ÷ 손절폭) → ${rrPts}/15`);
+
+  const t1 = input.plan?.t1 ?? null;
+  const hit = t1?.firstRate ?? null;
+  const hitPts = hit == null ? 7 : hit * 15;
+  parts.push(
+    hit == null
+      ? "1차 목표 도달 확률 계산 불가 (과거 사례 부족) → 7/15"
+      : `과거 과매도 뒤 20거래일 안에 손절선보다 1차 목표(${sp(t1!.pct)})에 먼저 도달 ${pr(hit)} → ${hitPts.toFixed(0)}/15`,
+  );
+
+  const nat = NATURE_PTS[input.dropNature] ?? 5;
+  parts.push(`하락 성격(외부 요인일수록 빠른 반등 기대) → ${nat}/10`);
+  let b = input.beta == null ? 5 : input.beta <= 1.5 ? 10 : input.beta <= 2 ? 7 : 3;
+  if (input.marketUp === false) {
+    b = Math.max(0, b - 3);
+    parts.push(`변동성(베타 ${input.beta?.toFixed(2) ?? "–"}) · 약세장 −3 → ${b}/10`);
+  } else parts.push(`변동성(베타 ${input.beta?.toFixed(2) ?? "–"}) → ${b}/10`);
+
+  const score = Math.round(clamp(t + h + rrPts + hitPts + nat + b, 0, 100));
+  const g = letterOf(score);
+  const label = score >= 80 ? "단기 반등 유력" : score >= 65 ? "단기 반등 기대" : score >= 50 ? "단기 불확실" : "단기 비추천";
   return {
     horizon: "short",
     period: "1~4주",
     grade: g,
     label,
-    tone: toneOf(g),
+    tone: toneOf(score),
     score,
-    expected:
-      input.res.n >= 2
-        ? `과거 비슷한 과매도 뒤 1주 ${sp(input.res.medianRet5)}, 4주 ${sp(input.res.medianRet20)} (중앙값)`
+    expected: t1
+      ? `1차 목표 ${sp(t1.pct)}${t1.hitRate != null ? ` (과거 도달 ${pr(t1.hitRate)}${t1.medianDays != null ? `, 보통 ${Math.round(t1.medianDays)}거래일` : ""})` : ""}` +
+        (input.plan?.stop ? ` · 손절 ${sp(input.plan.stop.pct)}` : "")
+      : input.res.n >= 2
+        ? `과거 비슷한 과매도 뒤 4주 ${sp(input.res.medianRet20)} (중앙값)`
         : "과거 사례 부족 — 기술적 신호 위주 판단",
     parts,
   };
 }
 
-/** 장기 (3~12개월): 적정가 대비 상승 여력 + 기업의 질 + 과거 과매도 뒤 12개월 성과 */
+/** 장기 (3~12개월): 상승 여력 25 + 보수적 시나리오 10 + 기업의 질 30 + 이익 전망 10 + 희석 위험 5 + 과거 12개월 성과 20 */
 export function longGrade(input: {
-  upside: number | null; // 적정가 대비 %
-  growth: number | null; // 0~25
+  upside: number | null; // 기준 적정가 대비 %
+  bearUpside: number | null; // 보수적 적정가 대비 %
+  bullUpside: number | null;
+  growth: number | null; // 0~15
   balance: number | null; // 0~15
-  downside: number | null; // 0~10
+  outlook: "ok" | "decline" | "collapse";
+  dilution: number | null; // 1년간 주식 수 변화
   res: Resilience;
-  blocked: string | null; // 회피 신호·장기 보유 부적합이면 D
+  blocked: string | null; // 회피 신호·장기 보유 부적합이면 F
 }): HorizonGrade {
   const parts: string[] = [];
-  const u = input.upside == null ? 10 : (clamp(input.upside, 0, 60) / 60) * 35;
-  parts.push(input.upside == null ? "적정가 계산 불가 → 10/35" : `적정가 대비 상승 여력 ${sp(input.upside)} → ${u.toFixed(0)}/35`);
-  const q = ((input.growth ?? 12) / 25) * 20 + ((input.balance ?? 7) / 15) * 15 + ((input.downside ?? 5) / 10) * 10;
-  parts.push(`기업의 질(실적 ${input.growth ?? "–"}/25 · 재무 ${input.balance ?? "–"}/15 · 하방 위험 ${input.downside ?? "–"}/10) → ${q.toFixed(0)}/45`);
+  const u = input.upside == null ? 8 : (clamp(input.upside, 0, 60) / 60) * 25;
+  parts.push(input.upside == null ? "적정가 계산 불가 → 8/25" : `기준 적정가까지 상승 여력 ${sp(input.upside)} → ${u.toFixed(0)}/25`);
+  const bu = input.bearUpside == null ? 3 : (clamp(input.bearUpside, -20, 30) + 20) / 5;
+  parts.push(input.bearUpside == null ? "보수적 시나리오 계산 불가 → 3/10" : `보수적 적정가 대비 ${sp(input.bearUpside)} (하방 여유) → ${bu.toFixed(0)}/10`);
+  const q = ((input.growth ?? 7) / 15) * 15 + ((input.balance ?? 7) / 15) * 15;
+  parts.push(`기업의 질(성장성 ${input.growth ?? "–"}/15 · 재무 ${input.balance ?? "–"}/15) → ${q.toFixed(0)}/30`);
+  const o = input.outlook === "ok" ? 10 : input.outlook === "decline" ? 3 : 0;
+  parts.push(`내년 이익 전망 ${input.outlook === "ok" ? "유지·성장" : input.outlook === "decline" ? "감소" : "적자 전환"} → ${o}/10`);
+  const d = input.dilution;
+  const dp = d == null ? 3 : d <= 0.02 ? 5 : d <= 0.05 ? 3 : d <= 0.1 ? 1 : 0;
+  parts.push(d == null ? "주식 희석 확인 불가 → 3/5" : `1년간 주식 수 ${sp(d * 100)} → ${dp}/5`);
   let h: number;
   const r = input.res;
   const w = r.winRate250;
   const m = r.medianRet250 ?? r.medianRet60;
   if (r.n >= 2 && m != null) {
     h = (w ?? 0.5) * 12 + ((clamp(m, -20, 40) + 20) / 60) * 8;
-    parts.push(`과거 과매도 뒤 ${r.medianRet250 != null ? "12개월" : "3개월"} 수익 중앙값 ${sp(m)}${w != null ? `, 상승 확률 ${(w * 100).toFixed(0)}%` : ""} → ${h.toFixed(0)}/20`);
+    parts.push(`과거 과매도 뒤 ${r.medianRet250 != null ? "12개월" : "3개월"} 수익 중앙값 ${sp(m)}${w != null ? `, 상승 확률 ${pr(w)}` : ""} → ${h.toFixed(0)}/20`);
   } else {
     h = 10;
     parts.push("과거 장기 성과 사례 부족 → 중립 10/20");
   }
-  let score = Math.round(u + q + h);
+  let score = Math.round(clamp(u + bu + q + o + dp + h, 0, 100));
   if (input.blocked) {
-    score = Math.min(score, 30);
-    parts.push(`${input.blocked} → D등급`);
+    score = Math.min(score, 40);
+    parts.push(`${input.blocked} → F등급`);
   }
-  const g = input.blocked ? "D" : letter(score);
-  const label = { A: "장기 보유 유망", B: "장기 보유 적합", C: "장기 보통", D: "장기 부적합" }[g];
+  const g = input.blocked ? "F" : letterOf(score);
+  const label = input.blocked ? "장기 부적합" : score >= 80 ? "장기 보유 유망" : score >= 65 ? "장기 보유 적합" : score >= 50 ? "장기 보통" : "장기 부적합";
   return {
     horizon: "long",
     period: "3~12개월",
     grade: g,
     label,
-    tone: toneOf(g),
+    tone: input.blocked ? "bad" : toneOf(score),
     score,
-    expected: input.upside != null ? `적정가까지 ${sp(input.upside)}` + (r.medianRet250 != null ? ` · 과거 과매도 뒤 12개월 ${sp(r.medianRet250)}` : "") : "적정가 계산 불가",
+    expected:
+      input.upside != null
+        ? `기준 적정가까지 ${sp(input.upside)}` + (input.bearUpside != null && input.bullUpside != null ? ` (보수 ${sp(input.bearUpside)} ~ 낙관 ${sp(input.bullUpside)})` : "")
+        : "적정가 계산 불가",
     parts,
   };
 }

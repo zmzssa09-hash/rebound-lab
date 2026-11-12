@@ -2,7 +2,7 @@
 import DataTools from "@/components/DataTools";
 import { PageHeader, Section } from "@/components/ui";
 import { setData, useAppData, useHydrated } from "@/lib/store";
-import { SCORE_ITEMS } from "@/lib/scorecard";
+import { GRADE_SCALE, SCORE_ITEMS } from "@/lib/scorecard";
 import {
   CORE_IDEA,
   FAIR_VALUE_MODEL,
@@ -35,7 +35,7 @@ export default function StrategyPage() {
         <div className="text-xs text-good font-medium">최우선 원칙</div>
         <p className="mt-1.5 text-lg font-semibold">{FINAL_PRINCIPLE}</p>
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          반대로 매출 감소, 현금흐름 악화, 경쟁력 상실이 하락 원인이라면 RSI가 아무리 낮아도 피합니다. 종목 평가표에서 회피 신호가 하나라도
+          반대로 매출 감소, 현금흐름 악화, 경쟁력 상실이 하락 원인이라면 RSI가 아무리 낮아도 피합니다. 이중 투자전략 평가에서 회피 신호가 하나라도
           체크되거나 실적·재무 점수가 절반에 못 미치면 점수와 관계없이 ‘진입하지 않음’으로 판정됩니다.
         </p>
       </div>
@@ -82,7 +82,7 @@ export default function StrategyPage() {
         </Section>
       </div>
 
-      <Section title="종목 평가표 — 100점 만점">
+      <Section title="이중 투자전략 평가 — 100점 만점">
         <div className="overflow-x-auto -mx-4 sm:-mx-5">
           <table className="data min-w-[640px]">
             <thead>
@@ -103,12 +103,19 @@ export default function StrategyPage() {
             </tbody>
           </table>
         </div>
-        <div className="grid gap-2 sm:grid-cols-4 mt-4 text-sm">
-          <div className="rounded-lg border border-good/30 bg-good/5 p-3"><b className="num">80점 이상</b><br /><span className="text-muted">우수 — 진입 검토</span></div>
-          <div className="rounded-lg border border-good/30 bg-good/5 p-3"><b className="num">65~79점</b><br /><span className="text-muted">양호 — 분할 접근 검토</span></div>
-          <div className="rounded-lg border border-warn/30 bg-warn/5 p-3"><b className="num">50~64점</b><br /><span className="text-muted">보류 — 근거 보강 필요</span></div>
-          <div className="rounded-lg border border-bad/30 bg-bad/5 p-3"><b className="num">50점 미만</b><br /><span className="text-muted">제외</span></div>
+        <div className="grid grid-cols-4 sm:grid-cols-11 gap-1.5 mt-4 text-xs text-center">
+          {GRADE_SCALE.map(([g, r]) => (
+            <div key={g} className={`rounded-lg border py-1.5 ${g.startsWith("S") || g.startsWith("A") ? "border-good/40 bg-good/5" : g.startsWith("B") || g.startsWith("C") ? "border-warn/40 bg-warn/5" : "border-bad/40 bg-bad/5"}`}>
+              <b className="text-sm">{g}</b>
+              <br />
+              <span className="text-muted num">{r}</span>
+            </div>
+          ))}
         </div>
+        <p className="text-xs text-muted mt-2">
+          80점 이상 우수 · 65점 이상 양호 · 50점 이상 보류 · 50점 미만 제외. 추천 Top 10은 60점(C) 이상이고 장기 보유 기준을 통과한 종목에서 고르며, 한 번 들어온 종목은 50점 아래로 떨어지기 전까지 유지합니다.
+          회피 신호(매출 감소·현금흐름 악화·경쟁력 상실)가 있거나 장기 보유 기준에 못 미치면 점수와 상관없이 F입니다.
+        </p>
         <p className="text-xs text-muted mt-3">
           모든 항목은 재무·시세·뉴스 데이터로 자동 채점되고, 종목 분석 화면에서 직접 수정할 수 있습니다. 자동 점수는 출발점일 뿐이며 실제
           점수는 최신 실적과 공시를 확인한 후 산정합니다. 매출 감소·현금흐름 적자가 데이터로 확인되면 회피 신호가 자동으로 켜집니다.
@@ -117,7 +124,7 @@ export default function StrategyPage() {
       </Section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="이중 투자전략 적정가 모델 1.0">
+        <Section title="이중 투자전략 적정가 모델 1.1">
           <ul className="space-y-3 text-sm">
             {FAIR_VALUE_MODEL.map((m) => (
               <li key={m.label} className="flex gap-3">
@@ -129,7 +136,7 @@ export default function StrategyPage() {
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted mt-3">계산할 수 없는 항목(예: FCF 적자 기업의 DCF)은 빼고 나머지 비중으로 다시 나눕니다. 가정에 민감한 참고 시나리오입니다.</p>
+          <p className="text-xs text-muted mt-3">모든 주당가치는 완전희석주식수(스톡옵션·전환사채 포함)로 나눕니다. 같은 계산을 보수적(성장률 절반·할인율 +1%p·배수 ×0.8)·기준·낙관적(성장률 ×1.3·할인율 −1%p·배수 ×1.2) 가정으로 세 번 돌려 시나리오별 적정가를 냅니다. 계산할 수 없는 항목은 빼고 나머지 비중으로 다시 나누며, 자료가 부족하거나 방법별 결과 차이가 크면 신뢰도를 낮게 표시합니다.</p>
         </Section>
         <Section title="단기·장기 수익 등급">
           <ul className="space-y-3 text-sm">
@@ -140,11 +147,13 @@ export default function StrategyPage() {
               </li>
             ))}
           </ul>
-          <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-center">
-            {[["A", "75점↑"], ["B", "60~74"], ["C", "45~59"], ["D", "45 미만"]].map(([g, r]) => (
-              <div key={g} className="rounded-lg border border-line py-2"><b className="text-base">{g}</b><br /><span className="text-muted num">{r}</span></div>
-            ))}
-          </div>
+          <p className="text-xs text-muted mt-3">두 점수 모두 100점 만점이며 위와 같은 S+~F 등급을 씁니다. 단기 목표가(1~4주 안에 팔 가격)와 장기 적정가(가치평가 결과)는 다른 개념입니다.</p>
+          <div className="mt-4 text-sm font-medium">매수 구간 — 안전마진 적용</div>
+          <ul className="mt-1.5 text-xs text-muted space-y-1 leading-relaxed">
+            <li>매수가 = 기준 적정가 × (1 − 안전마진). 안전마진은 기본 20%에 적정가 신뢰도·변동성·소형주·현금흐름 적자에 따라 15~40%로 조정합니다.</li>
+            <li><b className="text-good">적극 매수 검토</b> 매수가 이하 · <b className="text-good">분할 매수</b> 매수가 ~ 안전마진 절반 · <b className="text-warn">관찰</b> ~ 적정가 · <b className="text-bad">고평가</b> 적정가 초과</li>
+            <li>손절선은 가장 가까운 지지선(3개월 저점·매물대 등) 아래로 정하고(현재가 대비 −5~−20%), 손익비가 1 미만이면 매수 구간이어도 관찰로 낮춥니다.</li>
+          </ul>
         </Section>
       </div>
 

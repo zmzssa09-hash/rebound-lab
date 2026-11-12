@@ -3,7 +3,7 @@ import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
 import type { HorizonGrade } from "@/lib/grades";
 import type { Resilience } from "@/lib/resilience";
-import { MODEL_NAME, type Valuation } from "@/lib/valuation";
+import { MODEL_NAME, type Sensitivity, type Valuation } from "@/lib/valuation";
 
 const dateKo = (t: number) => new Date(t * 1000).toLocaleDateString("ko-KR", { year: "2-digit", month: "short", day: "numeric" });
 
@@ -35,21 +35,90 @@ export function GradeBoxes({ grades, loading }: { grades: { short: HorizonGrade;
   );
 }
 
+const CONF_TONE = { high: "good", mid: "warn", low: "bad" } as const;
+const usdBig = (v: number | null) =>
+  v == null ? "–" : Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(0)}M` : `$${v.toFixed(0)}`;
+
 /** 적정가 계산 근거 */
-export function ValuationPanel({ v, price }: { v: Valuation | null; price: number }) {
+export function ValuationPanel({ v, price, sensitivity }: { v: Valuation | null; price: number; sensitivity?: Sensitivity | null }) {
   if (!v) return null;
+  const up = (x: number | null) => (x != null && price > 0 ? ((x - price) / price) * 100 : null);
   return (
-    <Section title={`적정가 계산 — ${MODEL_NAME}`}>
+    <Section title={`적정가 계산 — ${MODEL_NAME}`} right={<Chip tone={v.fairValue != null ? CONF_TONE[v.confidence.level] : "neutral"}>{v.confidence.label}</Chip>}>
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <div>
-          <div className="text-xs text-muted">적정가</div>
+          <div className="text-xs text-muted">기준 적정가</div>
           <div className="text-3xl font-semibold num">{v.fairValue != null ? money(v.fairValue) : "계산 불가"}</div>
         </div>
         <div>
           <div className="text-xs text-muted">현재가 {money(price)} 대비</div>
-          <div className={`text-xl font-semibold num ${toneOf(v.upside)}`}>{pct(v.upside, 1)}</div>
+          <div className={`text-xl font-semibold num ${toneOf(up(v.fairValue))}`}>{pct(up(v.fairValue), 1)}</div>
         </div>
       </div>
+
+      {v.scenarios.length > 0 && (
+        <div className="overflow-x-auto mt-4 -mx-4 sm:-mx-5">
+          <table className="data min-w-[420px]">
+            <thead>
+              <tr>
+                <th>구분</th>
+                {v.scenarios.map((s) => <th key={s.key} className="text-right">{s.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="text-muted">적정 주당가치</td>
+                {v.scenarios.map((s) => <td key={s.key} className={`text-right num ${s.key === "base" ? "font-semibold" : ""}`}>{money(s.fairValue)}</td>)}
+              </tr>
+              <tr>
+                <td className="text-muted">현재가 대비</td>
+                {v.scenarios.map((s) => <td key={s.key} className={`text-right num ${toneOf(up(s.fairValue))}`}>{pct(up(s.fairValue), 0)}</td>)}
+              </tr>
+              <tr>
+                <td className="text-muted">적정 시가총액</td>
+                {v.scenarios.map((s) => <td key={s.key} className="text-right num">{usdBig(s.marketCap)}</td>)}
+              </tr>
+              <tr>
+                <td className="text-muted text-xs">가정: 시작 성장률 · 할인율 · 비교 배수</td>
+                {v.scenarios.map((s) => (
+                  <td key={s.key} className="text-right num text-xs text-muted">
+                    {(s.growth * 100).toFixed(0)}% · {s.rate != null ? `${(s.rate * 100).toFixed(1)}%` : "–"} · ×{s.multipleAdj}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
+        <div className="rounded-lg border border-line p-2">
+          <div className="text-muted">순현금</div>
+          <div className={`num font-medium mt-0.5 ${toneOf(v.netCash)}`}>{usdBig(v.netCash)}</div>
+        </div>
+        <div className="rounded-lg border border-line p-2">
+          <div className="text-muted">발행주식</div>
+          <div className="num font-medium mt-0.5">{v.shares.basic ? `${(v.shares.basic / 1e6).toFixed(1)}M` : "확인 불가"}</div>
+        </div>
+        <div className="rounded-lg border border-line p-2">
+          <div className="text-muted">완전희석주식</div>
+          <div className="num font-medium mt-0.5">{v.shares.used ? `${(v.shares.used / 1e6).toFixed(1)}M` : "확인 불가"}</div>
+        </div>
+        <div className="rounded-lg border border-line p-2">
+          <div className="text-muted">1년간 주식 수 변화</div>
+          <div className={`num font-medium mt-0.5 ${v.shares.changeYoY != null && v.shares.changeYoY > 0.04 ? "text-bad" : ""}`}>
+            {v.shares.changeYoY != null ? `${v.shares.changeYoY > 0 ? "+" : ""}${(v.shares.changeYoY * 100).toFixed(1)}%` : "확인 불가"}
+          </div>
+        </div>
+      </div>
+      {v.fairValue != null && (
+        <details className="mt-2">
+          <summary className="text-xs text-accent cursor-pointer select-none">신뢰도 근거</summary>
+          <ul className="mt-1 text-xs text-muted space-y-0.5">
+            {v.confidence.reasons.map((r) => <li key={r}>• {r}</li>)}
+          </ul>
+        </details>
+      )}
       <div className="mt-4 space-y-2">
         {v.parts.map((p) => {
           const ok = p.value != null && p.value > 0;
@@ -68,9 +137,35 @@ export function ValuationPanel({ v, price }: { v: Valuation | null; price: numbe
           );
         })}
       </div>
+      {sensitivity && (
+        <details className="mt-3">
+          <summary className="text-xs text-accent cursor-pointer select-none">DCF 민감도 — 할인율·영구성장률이 바뀌면</summary>
+          <div className="overflow-x-auto mt-2">
+            <table className="data min-w-[320px]">
+              <thead>
+                <tr>
+                  <th className="text-xs">할인율 \ 영구성장률</th>
+                  {sensitivity.terms.map((t) => <th key={t} className="text-right">{(t * 100).toFixed(1)}%</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {sensitivity.rates.map((r, i) => (
+                  <tr key={r}>
+                    <td className="num">{(r * 100).toFixed(1)}%</td>
+                    {sensitivity.grid[i].map((x, j) => (
+                      <td key={j} className={`text-right num ${i === 1 && j === 1 ? "font-semibold" : ""}`}>{money(x)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-muted mt-1">DCF 항목만의 주당가치입니다(가운데가 기준). 표의 값 차이가 클수록 가정에 민감한 기업입니다.</p>
+        </details>
+      )}
       <ul className="text-xs text-muted mt-3 space-y-0.5">
         {v.notes.map((n) => <li key={n}>{n}</li>)}
-        <li>애널리스트 목표가·투자의견은 사용하지 않습니다.</li>
+        <li>애널리스트 목표가·투자의견은 사용하지 않습니다. 재무 수치는 야후 파이낸스 집계 기준이며, SEC 공시 원문과 다를 수 있습니다.</li>
       </ul>
     </Section>
   );

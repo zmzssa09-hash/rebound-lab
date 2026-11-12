@@ -103,7 +103,7 @@ function WatchCard({ item, quote }: { item: WatchItem; quote: ReturnType<typeof 
         </Link>
       ) : (
         <Link href={`/analyze/${item.symbol}`} className="mt-3 block text-xs text-muted hover:text-accent">
-          종목 평가표 미작성 — 채점하기 →
+          이중 투자전략 평가 보기 →
         </Link>
       )}
 

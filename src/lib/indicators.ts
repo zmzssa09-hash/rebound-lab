@@ -84,3 +84,59 @@ export function last<T>(arr: (T | null)[], offset = 0): T | null {
   const v = arr[arr.length - 1 - offset];
   return v === undefined ? null : v;
 }
+
+interface HLC {
+  high: number;
+  low: number;
+  close: number;
+}
+
+/** Wilder 방식 ATR (평균 실제 변동폭) */
+export function atr(bars: HLC[], period = 14): Series {
+  const out: Series = new Array(bars.length).fill(null);
+  if (bars.length <= period) return out;
+  const tr = bars.map((b, i) =>
+    i === 0 ? b.high - b.low : Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)),
+  );
+  let a = tr.slice(1, period + 1).reduce((x, y) => x + y, 0) / period;
+  out[period] = a;
+  for (let i = period + 1; i < bars.length; i++) {
+    a = (a * (period - 1) + tr[i]) / period;
+    out[i] = a;
+  }
+  return out;
+}
+
+/** Wilder 방식 ADX + 방향 지표(+DI, −DI). ADX가 높을수록 추세(상승이든 하락이든)가 강하다 */
+export function adx(bars: HLC[], period = 14): { adx: Series; plusDI: Series; minusDI: Series } {
+  const len = bars.length;
+  const adxS: Series = new Array(len).fill(null);
+  const pS: Series = new Array(len).fill(null);
+  const mS: Series = new Array(len).fill(null);
+  if (len <= period * 2) return { adx: adxS, plusDI: pS, minusDI: mS };
+  let trS = 0, pdmS = 0, mdmS = 0;
+  const dx: number[] = [];
+  for (let i = 1; i < len; i++) {
+    const b = bars[i], p = bars[i - 1];
+    const up = b.high - p.high, down = p.low - b.low;
+    const pdm = up > down && up > 0 ? up : 0;
+    const mdm = down > up && down > 0 ? down : 0;
+    const tr = Math.max(b.high - b.low, Math.abs(b.high - p.close), Math.abs(b.low - p.close));
+    if (i <= period) {
+      trS += tr; pdmS += pdm; mdmS += mdm;
+      if (i < period) continue;
+    } else {
+      trS = trS - trS / period + tr;
+      pdmS = pdmS - pdmS / period + pdm;
+      mdmS = mdmS - mdmS / period + mdm;
+    }
+    const pdi = trS ? (100 * pdmS) / trS : 0;
+    const mdi = trS ? (100 * mdmS) / trS : 0;
+    pS[i] = pdi;
+    mS[i] = mdi;
+    dx.push(pdi + mdi ? (100 * Math.abs(pdi - mdi)) / (pdi + mdi) : 0);
+    if (dx.length === period) adxS[i] = dx.reduce((x, y) => x + y, 0) / period;
+    else if (dx.length > period) adxS[i] = ((adxS[i - 1] as number) * (period - 1) + dx[dx.length - 1]) / period;
+  }
+  return { adx: adxS, plusDI: pS, minusDI: mS };
+}

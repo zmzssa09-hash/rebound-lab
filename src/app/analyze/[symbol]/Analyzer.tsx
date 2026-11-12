@@ -13,6 +13,7 @@ import { etpKind } from "@/lib/strategy";
 import { useChart, useInsight } from "@/lib/useQuotes";
 import DropReasonPanel from "@/components/DropReasonPanel";
 import { GradeBoxes, ResiliencePanel, ValuationPanel } from "@/components/ValuationPanel";
+import { TradePlanPanel } from "@/components/TradePlanPanel";
 
 export default function Analyzer({ symbol }: { symbol: string }) {
   const { data, error, loading } = useChart(symbol);
@@ -28,8 +29,13 @@ export default function Analyzer({ symbol }: { symbol: string }) {
   const signals = useMemo(() => (snap ? buildSignals(snap) : []), [snap]);
   const verdict = useMemo(() => (snap ? buildVerdict(snap) : null), [snap]);
 
+  const plan = insight.data?.plan ?? null;
   const lines = useMemo<PriceLineDef[]>(() => {
     const out: PriceLineDef[] = [];
+    if (plan?.t1) out.push({ price: plan.t1.price, title: "1차 목표", color: "#34d399", dashed: true });
+    if (plan?.t2) out.push({ price: plan.t2.price, title: "2차 목표", color: "#34d399", dashed: true });
+    if (plan?.stop) out.push({ price: plan.stop.price, title: "손절", color: "#fb7185", dashed: true });
+    if (plan?.zones) out.push({ price: plan.zones.buyPrice, title: "매수가", color: "#fbbf24", dashed: true });
     if (position) {
       out.push({ price: position.avgCost, title: "평단", color: "#e6eaf2", dashed: true });
       if (position.target) out.push({ price: position.target, title: "목표", color: "#34d399" });
@@ -40,7 +46,7 @@ export default function Analyzer({ symbol }: { symbol: string }) {
       if (z.low !== z.high) out.push({ price: z.low, title: "", color: "#6ea8fe", dashed: true });
     });
     return out;
-  }, [position, watch]);
+  }, [position, watch, plan]);
 
   if (loading && !data) {
     return <div className="card h-96 animate-pulse" />;
@@ -108,9 +114,12 @@ export default function Analyzer({ symbol }: { symbol: string }) {
         <div className="text-xl font-semibold mt-1">{verdict.title}</div>
         <p className="text-sm mt-1.5 text-text/90 leading-relaxed">{verdict.summary}</p>
         <p className="text-xs mt-3 text-muted">
-          이 판정은 매수·매도 추천이 아닙니다. 과매도는 반등의 충분조건이 아니며, 장기 보유 여부는 아래 종목 평가표로 따로 판단합니다.
+          이 판정은 매수·매도 추천이 아닙니다. 과매도는 반등의 충분조건이 아니며, 장기 보유 여부는 아래 이중 투자전략 평가로 따로 판단합니다.
         </p>
       </div>
+
+      {/* 지금 사도 될까: 행동 지침 + 매수 구간 + 목표가·손절 */}
+      <TradePlanPanel plan={insight.data?.plan ?? null} price={snap.price} blocked={insight.data?.blocked ?? null} loading={insight.loading} shortScore={insight.data?.grades.short.score ?? null} />
 
       {/* 단기·장기 등급 */}
       <GradeBoxes grades={insight.data?.grades ?? null} loading={insight.loading} />
@@ -211,7 +220,7 @@ export default function Analyzer({ symbol }: { symbol: string }) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2 items-start">
-        <ValuationPanel v={insight.data?.valuation ?? null} price={snap.price} />
+        <ValuationPanel v={insight.data?.valuation ?? null} price={snap.price} sensitivity={insight.data?.sensitivity ?? null} />
         <ResiliencePanel r={insight.data?.resilience ?? null} />
       </div>
 

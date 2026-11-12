@@ -10,8 +10,8 @@ import type { Pick, PickExit } from "./types";
 const FILE = path.join(process.cwd(), ".data", "history.json");
 
 export const TOP_N = 10;
-export const NEW_MIN_SCORE = 65; // 신규 진입 최소 점수
-export const KEEP_MIN_SCORE = 55; // 기존 추천 유지 최소 점수
+export const NEW_MIN_SCORE = 60; // 신규 진입 최소 점수
+export const KEEP_MIN_SCORE = 50; // 기존 추천 유지 최소 점수
 const KEEP_MAX_RSI = 60; // 이 이상이면 반등 완료로 보고 졸업
 const SWAP_MARGIN = 3;
 

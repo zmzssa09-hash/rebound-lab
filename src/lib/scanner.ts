@@ -9,7 +9,7 @@ import type { HorizonGrade } from "./grades";
 import { autoFinal, buildInsight } from "./insight";
 import { koreanName } from "./naver";
 import { activeSymbols, selectTop } from "./ranking";
-import { RED_FLAGS } from "./scorecard";
+import { LONG_TERM_MIN, RED_FLAGS } from "./scorecard";
 import type { Bar, Pick, PickExit, Tone, Trend } from "./types";
 import { fetchChart } from "./yahoo";
 
@@ -256,7 +256,7 @@ async function sparkBatch(symbols: string[]): Promise<Map<string, { bars: Bar[];
 const PICK_MIN_PRICE = 3;
 const PICK_MIN_DV = 2_000_000; // 당일 거래대금 200만 달러 이상
 
-const pickGrade = (g: HorizonGrade) => ({ grade: g.grade, label: g.label, tone: g.tone, expected: g.expected });
+const pickGrade = (g: HorizonGrade) => ({ grade: g.grade, label: g.label, tone: g.tone, expected: g.expected, score: g.score });
 
 async function buildPick(row: ScanRow): Promise<Pick | null> {
   const chart = await fetchChart(row.symbol, "2y");
@@ -270,7 +270,7 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
   let excludeReason: string | null = null;
   if (flags.length) excludeReason = `회피 신호: ${flags.join("·")} (${Object.values(ins.auto.flags).join(" / ")})`;
   else if (r.longTermOk === false)
-    excludeReason = `장기 보유 부적합: ${(r.scores.growth ?? 0) < 13 ? `실적·성장 ${r.scores.growth}/25` : `재무 ${r.scores.balance}/15`}`;
+    excludeReason = `장기 보유 부적합: ${(r.scores.growth ?? 0) < LONG_TERM_MIN.growth ? `성장성과 경쟁력 ${r.scores.growth}/15` : `재무 안정성 ${r.scores.balance}/15`}`;
   else if (r.scored < 4) excludeReason = "재무 데이터 부족으로 평가 불가";
 
   const nameKo = await koreanName(row.symbol).catch(() => null);
@@ -300,6 +300,30 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
     shortGrade: pickGrade(ins.grades.short),
     longGrade: pickGrade(ins.grades.long),
     resilienceSummary: ins.resilience.summary,
+    gradeLetter: r.grade.letter,
+    scenarios: {
+      bear: ins.valuation.scenarios.find((s) => s.key === "bear")?.fairValue ?? null,
+      base: ins.valuation.fairValue,
+      bull: ins.valuation.scenarios.find((s) => s.key === "bull")?.fairValue ?? null,
+    },
+    confidence: ins.valuation.fairValue != null ? { level: ins.valuation.confidence.level, label: ins.valuation.confidence.label } : null,
+    blocked: ins.blocked,
+    plan: {
+      t1: ins.plan.t1 && { price: ins.plan.t1.price, pct: ins.plan.t1.pct, basis: ins.plan.t1.basis, hitRate: ins.plan.t1.hitRate, medianDays: ins.plan.t1.medianDays },
+      t2: ins.plan.t2 && { price: ins.plan.t2.price, pct: ins.plan.t2.pct, basis: ins.plan.t2.basis, hitRate: ins.plan.t2.hitRate },
+      stop: ins.plan.stop,
+      rr: ins.plan.rr,
+      supports: ins.auto.supports,
+      zones: ins.plan.zones && {
+        margin: ins.plan.zones.margin,
+        buyPrice: ins.plan.zones.buyPrice,
+        aggressiveMax: ins.plan.zones.aggressiveMax,
+        splitMax: ins.plan.zones.splitMax,
+        watchMax: ins.plan.zones.watchMax,
+        fair: ins.plan.zones.fair,
+        bear: ins.plan.zones.bear,
+      },
+    },
   };
 }
 

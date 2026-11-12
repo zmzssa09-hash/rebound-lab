@@ -57,6 +57,11 @@ export interface Snapshot {
   high52: number | null;
   low52: number | null;
   drawdown52: number | null; // 52주 고점 대비 %
+  adx?: number | null; // 추세 강도 (25 이상 강한 추세)
+  adxPrev?: number | null; // 5거래일 전 ADX
+  plusDI?: number | null;
+  minusDI?: number | null;
+  atr?: number | null; // 14일 평균 실제 변동폭 ($)
 }
 
 export interface Signal {
@@ -130,7 +135,7 @@ export interface ResearchNote {
   notes: Record<string, string>;
   thesis: string;
   updatedAt: string;
-  // 종목 평가표
+  // 이중 투자전략 평가
   scores?: Record<string, number>; // 직접 채점 항목
   fairValue?: number; // 적정가치 (기준 시나리오)
   redFlags?: Record<string, boolean>;
@@ -179,9 +184,14 @@ export interface Pick {
   dropBullets: string[];
   tags: PickTag[];
   fromHigh3m: number;
-  fairValue: number | null; // 이중 투자전략 적정가 모델 1.0
-  shortGrade: { grade: string; label: string; tone: Tone; expected: string };
-  longGrade: { grade: string; label: string; tone: Tone; expected: string };
+  fairValue: number | null; // 이중 투자전략 적정가 모델 (기준 시나리오)
+  gradeLetter?: string | null; // S+ ~ F
+  shortGrade: { grade: string; label: string; tone: Tone; expected: string; score?: number };
+  longGrade: { grade: string; label: string; tone: Tone; expected: string; score?: number };
+  scenarios?: { bear: number | null; base: number | null; bull: number | null };
+  confidence?: { level: "high" | "mid" | "low"; label: string } | null;
+  plan?: PickPlan | null;
+  blocked?: string | null;
   resilienceSummary: string;
   // 순위 추적 (Top 10에 든 종목만)
   rank?: number;
@@ -192,6 +202,16 @@ export interface Pick {
   rankScore?: number; // 순위용 점수 = 점수 + 지속 보너스
   // 실시간 (API 응답 시 계산)
   live?: { price: number; changePct: number | null; rsi: number | null; total: number; at: number };
+}
+
+/** 추천 카드용 매매 계획 요약 */
+export interface PickPlan {
+  t1: { price: number; pct: number; basis: string; hitRate: number | null; medianDays: number | null } | null;
+  t2: { price: number; pct: number; basis: string; hitRate: number | null } | null;
+  stop: { price: number; pct: number; basis: string } | null;
+  rr: number | null;
+  supports: number[];
+  zones: { margin: number; buyPrice: number; aggressiveMax: number; splitMax: number; watchMax: number; fair: number; bear: number | null } | null;
 }
 
 export interface PickExit {
@@ -236,6 +256,10 @@ export interface Fundamentals {
   ebitda: number | null;
   forwardEps: number | null;
   trailingEps: number | null;
+  bookValuePerShare?: number | null; // 주당 순자산 (BPS)
+  priceToBook?: number | null; // PBR
+  dilutedShares?: number | null; // 최근 분기 희석 평균 주식 수 (스톡옵션·전환사채 등 포함)
+  sharesChangeYoY?: number | null; // 1년 전 대비 발행주식 수 변화 (0.1 = 10% 희석)
   shortPercentFloat: number | null;
   beta: number | null;
   earningsDate: number | null; // 가장 최근 또는 다음 실적 발표 (UNIX초)

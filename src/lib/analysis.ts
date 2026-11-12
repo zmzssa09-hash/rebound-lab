@@ -1,7 +1,7 @@
 // 전략 규칙을 코드로 옮긴 분석 엔진.
 // 원칙: RSI는 타이밍 보조 지표일 뿐. 과매도는 반등의 충분조건이 아니다.
 import type { Bar, ChartData, QuoteSummary, Signal, Snapshot, Trend, Verdict, Zone } from "./types";
-import { last, macd, rsi, sma } from "./indicators";
+import { adx, atr, last, macd, rsi, sma } from "./indicators";
 
 export const RSI_OVERSOLD = 30;
 export const RSI_WEAK = 40;
@@ -70,6 +70,11 @@ export function computeSnapshot(bars: Bar[], livePrice?: number, prevClose?: num
 
   const pc = prevClose ?? closes[closes.length - 2] ?? null;
 
+  // ADX·ATR: 고가·저가가 있는 일봉에서만 의미가 있음
+  const hasHL = bars.slice(-30).some((b) => b.high !== b.low);
+  const ax = hasHL ? adx(bars) : null;
+  const at = hasHL ? last(atr(bars)) : null;
+
   return {
     price,
     changePct: pc ? ((price - pc) / pc) * 100 : null,
@@ -92,6 +97,11 @@ export function computeSnapshot(bars: Bar[], livePrice?: number, prevClose?: num
     high52,
     low52,
     drawdown52: high52 ? ((price - high52) / high52) * 100 : null,
+    adx: ax ? last(ax.adx) : null,
+    adxPrev: ax ? last(ax.adx, 5) : null,
+    plusDI: ax ? last(ax.plusDI) : null,
+    minusDI: ax ? last(ax.minusDI) : null,
+    atr: at,
   };
 }
 
@@ -245,7 +255,7 @@ export function buildVerdict(s: Snapshot): Verdict {
       return {
         title: "과매도 · 안정 신호 확인 — 반등 후보",
         tone: "good",
-        summary: `안정 신호 ${stabilizers}/3개(MACD 개선·매도 거래량 진정·저점 유지)가 보입니다. 매수 전 종목 평가표로 장기 보유 기준과 철회 조건을 먼저 확인하세요.`,
+        summary: `안정 신호 ${stabilizers}/3개(MACD 개선·매도 거래량 진정·저점 유지)가 보입니다. 매수 전 이중 투자전략 평가로 장기 보유 기준과 철회 조건을 먼저 확인하세요.`,
       };
     }
     return {

@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { DropAnalysis } from "./dropReason";
 import type { HorizonGrade } from "./grades";
 import type { Resilience } from "./resilience";
-import type { Valuation } from "./valuation";
-import type { AutoScore } from "./scorecard";
+import type { Sensitivity, Valuation } from "./valuation";
+import type { AutoScore, MarketEnv } from "./scorecard";
+import type { TradePlan } from "./tradePlan";
 import type { ChartData, Fundamentals, QuoteError, QuoteSummary } from "./types";
 
 /** /api/insight 응답 (서버 lib/insight.ts의 Insight와 같은 모양) */
@@ -17,6 +18,10 @@ export interface Insight {
   valuation: Valuation;
   resilience: Resilience;
   grades: { short: HorizonGrade; long: HorizonGrade };
+  sensitivity: Sensitivity | null;
+  plan: TradePlan;
+  env: MarketEnv;
+  blocked: string | null;
 }
 
 /** 실시간 갱신 주기 */

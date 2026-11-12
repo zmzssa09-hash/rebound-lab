@@ -7,6 +7,8 @@ import { Chip, Empty, PageHeader, RsiChip, TONE_CLASS } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
 import { bigMoneyKo } from "@/lib/ko";
 import { SCORE_ITEMS } from "@/lib/scorecard";
+import { actionOf, zoneOf } from "@/lib/tradePlan";
+import { ZoneLadder } from "@/components/TradePlanPanel";
 import { setData, uid, useAppData } from "@/lib/store";
 import type { Pick, PickExit } from "@/lib/types";
 
@@ -25,13 +27,13 @@ interface PicksResponse {
 }
 
 const SHORT: Record<string, string> = {
-  growth: "실적",
-  discount: "할인",
   balance: "재무",
-  technical: "과매도",
+  growth: "성장",
+  value: "저평가",
+  technical: "기술",
+  market: "시장",
+  potential: "수익",
   resilience: "회복",
-  catalyst: "촉매",
-  downside: "안전",
 };
 
 const LIVE_MS = 60_000;
@@ -79,7 +81,7 @@ export default function PicksPage() {
     <div className="space-y-5">
       <PageHeader
         title="추천 종목 Top 10"
-        desc="RSI 30 이하로 떨어진 미국 주식 중 하락 이유를 확인하고 100점 평가표로 채점해, 단기 반등에 실패해도 장기 보유할 만한 기업만 골랐습니다. 한 번 추천된 종목은 조건이 유지되는 한 순위를 지킵니다."
+        desc="RSI 30 이하로 떨어진 미국 주식 중 하락 이유를 확인하고 100점 이중 투자전략 평가로 채점해, 단기 반등에 실패해도 장기 보유할 만한 기업만 골랐습니다. 한 번 추천된 종목은 조건이 유지되는 한 순위를 지킵니다."
       />
 
       {/* 상태 줄 */}
@@ -120,7 +122,7 @@ export default function PicksPage() {
         <div className="card h-64 animate-pulse" />
       ) : top.length === 0 ? (
         <div className="card">
-          <Empty>{running ? "첫 분석을 진행하고 있습니다. 끝나면 Top 10이 표시됩니다 (5분 안팎)." : data.scannedAt == null ? "첫 분석 결과를 기다리고 있습니다. 미국 정규장 동안 30분마다 자동으로 분석됩니다." : "지금은 추천 조건(65점 이상, 장기 보유 기준 통과)을 만족하는 종목이 없습니다."}</Empty>
+          <Empty>{running ? "첫 분석을 진행하고 있습니다. 끝나면 Top 10이 표시됩니다 (5분 안팎)." : data.scannedAt == null ? "첫 분석 결과를 기다리고 있습니다. 미국 정규장 동안 30분마다 자동으로 분석됩니다." : "지금은 추천 조건(60점 이상, 장기 보유 기준 통과)을 만족하는 종목이 없습니다."}</Empty>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -204,7 +206,7 @@ export default function PicksPage() {
       )}
 
       <p className="text-xs text-muted leading-relaxed">
-        가격과 가격에 따라 바뀌는 점수(기술적 과매도·할인율)는 1분마다, 하락 이유·재무를 포함한 전체 분석은 미국 정규장 동안 30분마다, 마감 직후 한 번 더 갱신됩니다(장 닫힌 시간·휴장일은 쉼). 추천은 공개 데이터로
+        가격, 가격에 따라 바뀌는 점수(기술적 분석·저평가), 지금 해야 할 일(매수 구간)은 1분마다, 하락 이유·재무를 포함한 전체 분석은 미국 정규장 동안 30분마다, 마감 직후 한 번 더 갱신됩니다(장 닫힌 시간·휴장일은 쉼). 추천은 공개 데이터로
         자동 계산한 결과이며 투자 권유가 아닙니다. 대상: 주가 $3 이상, 당일 거래대금 200만 달러 이상인 미국 상장 주식(한국 기업 제외).
       </p>
     </div>
@@ -245,6 +247,7 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
             <span className="text-2xl font-semibold">{total}</span>
             <span className="text-muted text-sm">/100</span>
           </div>
+          {p.gradeLetter && <div className="text-xs font-semibold text-accent">{p.gradeLetter}등급</div>}
           {p.live && p.live.total !== p.total && <div className="text-[10px] text-muted num">분석 시점 {p.total}점</div>}
         </div>
       </div>
@@ -256,9 +259,14 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
         {upside != null && (
           <span className="text-muted text-xs">
             적정가 ${p.fairValue!.toFixed(2)} (<span className={toneOf(upside)}>{pct(upside, 0)}</span>)
+            {p.scenarios?.bear != null && p.scenarios.bull != null && <> · 범위 ${p.scenarios.bear.toFixed(2)}~${p.scenarios.bull.toFixed(2)}</>}
+            {p.confidence && <> · {p.confidence.label}</>}
           </span>
         )}
       </div>
+
+      {/* 지금 해야 할 일 */}
+      {p.plan && <PlanBox p={p} price={price} />}
 
       {/* 단기·장기 등급 */}
       {p.shortGrade && p.longGrade && (
@@ -327,6 +335,43 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
         <Link href={`/analyze/${p.symbol}`} className="text-sm text-accent">상세 분석·뉴스 보기 →</Link>
         {watched ? <span className="text-xs text-muted">관심 종목에 있음</span> : <button className="text-xs text-accent" onClick={onWatch}>+ 관심 종목</button>}
       </div>
+    </div>
+  );
+}
+
+function PlanBox({ p, price }: { p: Pick; price: number }) {
+  const plan = p.plan!;
+  const zone = zoneOf(plan.zones, price);
+  const act = actionOf({ blocked: p.blocked ?? null, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore: p.shortGrade?.score ?? null });
+  const rel = (x: number) => pct(((x - price) / price) * 100, 1);
+  return (
+    <div className={`mt-3 rounded-lg border p-3 ${TONE_CLASS[act.tone]}`}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-[11px] opacity-80 shrink-0">지금 해야 할 일</span>
+        <span className="text-base font-bold text-text">{act.title}</span>
+      </div>
+      <p className="text-xs text-text/85 mt-0.5 leading-snug">{act.text}</p>
+      <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] num">
+        <div>
+          <div className="opacity-75">1차 목표</div>
+          <div className="text-text font-medium">{plan.t1 ? <>{money(plan.t1.price)} <span className="text-up">{rel(plan.t1.price)}</span></> : "–"}</div>
+          {plan.t1?.hitRate != null && <div className="opacity-75">과거 도달 {(plan.t1.hitRate * 100).toFixed(0)}%</div>}
+        </div>
+        <div>
+          <div className="opacity-75">손절</div>
+          <div className="text-text font-medium">{plan.stop ? <>{money(plan.stop.price)} <span className="text-down">{rel(plan.stop.price)}</span></> : "–"}</div>
+        </div>
+        <div>
+          <div className="opacity-75">손익비</div>
+          <div className="text-text font-medium">{plan.rr != null ? `${plan.rr.toFixed(1)} : 1` : "–"}</div>
+        </div>
+      </div>
+      {plan.zones && (
+        <details className="mt-1.5">
+          <summary className="text-[11px] text-accent cursor-pointer select-none">매수 구간 보기 (매수가 {money(plan.zones.buyPrice)})</summary>
+          <ZoneLadder z={plan.zones} price={price} current={zone} stop={plan.stop?.price ?? null} compact />
+        </details>
+      )}
     </div>
   );
 }

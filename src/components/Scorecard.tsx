@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { Section, TONE_CLASS } from "@/components/ui";
 import { money } from "@/lib/format";
-import { discountOf, finalScore, RED_FLAGS, SCORE_ITEMS, type AutoScore } from "@/lib/scorecard";
+import { discountOf, finalScore, LONG_TERM_MIN, RED_FLAGS, SCORE_ITEMS, type AutoScore } from "@/lib/scorecard";
 import { setData, useAppData, useHydrated } from "@/lib/store";
 import type { ResearchNote, Snapshot } from "@/lib/types";
 
@@ -20,7 +20,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
       research: { ...d.research, [symbol]: { ...fn(d.research[symbol] ?? blank()), updatedAt: new Date().toISOString() } },
     }));
 
-  const base: AutoScore = auto ?? { scores: {}, reasons: {}, fairValue: null, fairValueSource: null, flags: {}, suspects: {} };
+  const base: AutoScore = auto ?? { scores: {}, reasons: {}, fairValue: null, bearValue: null, confidence: null, supports: [], fairValueSource: null, flags: {}, suspects: {} };
   const r = finalScore(base, { scores: note.scores, fairValue: note.fairValue, redFlags: note.redFlags }, snap.price);
   const discount = discountOf(snap.price, r.fairValue);
 
@@ -61,7 +61,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
     });
 
   return (
-    <Section title="종목 평가표 — 100점 만점" right={<span className="text-xs text-muted">자동 채점 · 직접 수정 가능</span>}>
+    <Section title="이중 투자전략 평가 — 100점 만점" right={<span className="text-xs text-muted">자동 채점 · 직접 수정 가능</span>}>
       {!auto && <div className="h-2 rounded bg-panel-2 animate-pulse mb-4" />}
 
       {/* 종합 */}
@@ -112,11 +112,11 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
         </div>
         <div className="rounded-lg border border-line p-4">
           <div className="text-sm font-semibold">단기 반등에 실패해도 장기 보유할 만한 기업인가?</div>
-          <p className="text-xs text-muted mt-0.5">실적·성장성 13점 이상, 재무건전성 8점 이상이고 회피 신호가 없어야 통과합니다.</p>
+          <p className="text-xs text-muted mt-0.5">성장성과 경쟁력 {LONG_TERM_MIN.growth}점 이상, 재무 안정성 {LONG_TERM_MIN.balance}점 이상이고 회피 신호가 없어야 통과합니다.</p>
           <div className="mt-3 text-lg font-semibold">
             {r.longTermOk === true && <span className="text-good">예 — 장기 보유 가능</span>}
             {r.longTermOk === false && <span className="text-bad">아니오 — 진입하지 않음</span>}
-            {r.longTermOk === null && <span className="text-muted">판단 불가 — 실적·재무 점수가 필요합니다</span>}
+            {r.longTermOk === null && <span className="text-muted">판단 불가 — 성장성·재무 점수가 필요합니다</span>}
           </div>
         </div>
       </div>
@@ -125,7 +125,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
       <div className="space-y-3 mt-4">
         {SCORE_ITEMS.map((it) => {
           const score = r.scores[it.key];
-          const manual = overrides[it.key] != null || (it.key === "discount" && note.fairValue != null);
+          const manual = overrides[it.key] != null || (it.key === "value" && note.fairValue != null);
           const fill = score != null ? (score / it.max) * 100 : 0;
           return (
             <div key={it.key} className="rounded-lg border border-line p-3 sm:p-4">
@@ -133,7 +133,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
                 <div className="flex-1 min-w-56">
                   <div className="font-medium">
                     {it.label} <span className="text-xs text-muted font-normal">{it.max}점</span>
-                    <span className={`ml-1.5 text-[11px] ${manual ? "text-warn" : "text-accent"}`}>{manual ? "직접 수정" : "자동"}</span>
+                    <span className={`ml-1.5 text-[11px] ${manual ? "text-warn" : "text-accent"}`}>{manual ? "직접 수정" : it.auto ? "자동 전용" : "자동"}</span>
                   </div>
                   <div className="text-xs text-muted mt-0.5">{it.guide}</div>
                 </div>
@@ -152,7 +152,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
                 </ul>
               )}
 
-              {it.key === "discount" ? (
+              {it.key === "value" ? (
                 <div className="flex flex-wrap items-center gap-2 mt-3 text-sm">
                   <span className="text-muted">적정가치 $</span>
                   <input
@@ -173,7 +173,7 @@ export default function Scorecard({ symbol, snap, auto }: { symbol: string; snap
                     {note.fairValue == null && base.fairValueSource && ` (${base.fairValueSource})`}
                   </span>
                 </div>
-              ) : it.key !== "technical" ? (
+              ) : !it.auto ? (
                 <div className="flex flex-wrap items-center gap-3 mt-3">
                   <input
                     type="range"
