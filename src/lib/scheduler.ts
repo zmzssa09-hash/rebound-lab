@@ -49,7 +49,17 @@ export function ensureScheduler() {
   setTimeout(() => void tick(), 5_000);
 }
 
+/** GitHub Actions 예약 시각: 매시 7분 (.github/workflows/hourly-scan.yml 의 cron 과 맞출 것) */
+const CRON_MINUTE = 7;
+
 export async function nextScanAt(): Promise<number | null> {
+  if (!LOCAL_SCHEDULER) {
+    const d = new Date();
+    d.setUTCSeconds(0, 0);
+    d.setUTCMinutes(CRON_MINUTE);
+    if (d.getTime() <= Date.now()) d.setUTCHours(d.getUTCHours() + 1);
+    return d.getTime(); // 실제 실행은 GitHub 사정으로 몇 분 늦어질 수 있음
+  }
   const last = await lastScanAt();
   return last ? last + STALE_MS : null;
 }
