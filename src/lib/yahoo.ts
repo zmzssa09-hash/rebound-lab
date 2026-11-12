@@ -105,6 +105,14 @@ export async function fetchChart(symbol: string, range = "2y"): Promise<ChartDat
       marketTime,
       fiftyTwoWeekHigh: m.fiftyTwoWeekHigh ?? null,
       fiftyTwoWeekLow: m.fiftyTwoWeekLow ?? null,
+      tradingPeriod: m.currentTradingPeriod?.regular
+        ? {
+            preStart: m.currentTradingPeriod.pre?.start ?? m.currentTradingPeriod.regular.start,
+            regularStart: m.currentTradingPeriod.regular.start,
+            regularEnd: m.currentTradingPeriod.regular.end,
+            postEnd: m.currentTradingPeriod.post?.end ?? m.currentTradingPeriod.regular.end,
+          }
+        : null,
     },
     bars,
     fetchedAt: Date.now(),

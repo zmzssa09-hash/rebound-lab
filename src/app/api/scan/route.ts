@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const limit = Math.min(num("limit", 100), 500);
   const offset = Math.max(num("offset", 0), 0);
 
-  ensureScheduler(); // 1시간마다 자동 재분석
+  ensureScheduler(); // 장중 30분마다 자동 재분석
   const result = await getResult();
   const status = getStatus();
 
@@ -71,8 +71,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST() {
-  // 배포 환경에서는 GitHub Actions가 매시간 분석하므로 수동 실행 불가
-  if (!LOCAL_SCHEDULER) return Response.json({ started: false, status: getStatus(), message: "매시간 자동 분석됩니다." });
+  // 배포 환경에서는 GitHub Actions가 장중 30분마다 분석하므로 수동 실행 불가
+  if (!LOCAL_SCHEDULER) return Response.json({ started: false, status: getStatus(), message: "장중 30분마다 자동 분석됩니다." });
   const started = startScan();
   return Response.json({ started, status: getStatus() });
 }

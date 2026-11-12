@@ -1,17 +1,21 @@
-# 매시간 미국 전 종목을 분석해서 결과를 'data' 브랜치에 저장한다.
-# 사이트(Vercel)는 DATA_BASE_URL 로 이 브랜치의 scan.json 을 읽는다.
-name: hourly-scan
+# 미국 정규장이 열려 있는 동안 30분마다 전 종목을 재분석하고, 정규장 마감 직후 1회 확정 분석한다.
+# 결과는 'data' 브랜치에 저장되고, 사이트(Vercel)는 DATA_BASE_URL 로 이 브랜치를 읽는다.
+#
+# 예약은 평일 UTC 13~21시 매시 5분·35분에 깨어나고(서머타임 양쪽을 모두 덮도록 넉넉하게),
+# 실제 실행 여부는 scripts/scan.ts 가 야후의 SPY 거래시간 정보로 판단한다.
+# (휴장일·조기 폐장 자동 반영, 장이 닫혀 있으면 아무것도 올리지 않고 끝남)
+name: market-scan
 
 on:
   schedule:
-    - cron: "7 * * * *" # 매시 7분 (UTC 기준, GitHub 사정으로 몇 분 늦어질 수 있음)
-  workflow_dispatch: # Actions 탭에서 수동 실행 가능
+    - cron: "5,35 13-21 * * 1-5"
+  workflow_dispatch: # Actions 탭에서 수동 실행 → 장 상태와 관계없이 바로 분석
 
 permissions:
   contents: write
 
 concurrency:
-  group: hourly-scan
+  group: market-scan
   cancel-in-progress: false
 
 jobs:
@@ -36,11 +40,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Run full scan
-        run: npm run scan
+      - name: Scan (장 시간 규칙에 따라 실행 또는 건너뜀)
+        id: scan
+        run: npx tsx scripts/scan.ts ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
 
       # data 브랜치는 항상 커밋 1개만 유지 (저장소 용량이 계속 늘지 않도록)
       - name: Publish data branch
+        if: steps.scan.outputs.ran == 'true'
         run: |
           cd .data
           rm -rf .git scan.lock

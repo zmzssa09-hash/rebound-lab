@@ -207,7 +207,7 @@ export default function ScreenerPage() {
           </span>
           {data?.scannedAt && (
             <span className="text-xs text-muted">
-              {new Date(data.scannedAt).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} 스캔 · 1시간마다 자동 갱신
+              {new Date(data.scannedAt).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} 스캔 · 장중 30분마다 자동 갱신
             </span>
           )}
         </div>

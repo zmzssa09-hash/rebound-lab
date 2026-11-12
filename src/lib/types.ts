@@ -21,6 +21,8 @@ export interface ChartMeta {
   marketTime: number;
   fiftyTwoWeekHigh: number | null;
   fiftyTwoWeekLow: number | null;
+  /** 거래 시간 (UNIX초) — 휴장일·조기 폐장이 반영된 값 */
+  tradingPeriod?: { preStart: number; regularStart: number; regularEnd: number; postEnd: number } | null;
 }
 
 export interface ChartData {

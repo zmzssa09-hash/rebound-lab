@@ -1,8 +1,10 @@
-// 서버 전용: 1시간마다 전 종목 재분석 (로컬 실행용)
-// 배포(Vercel) 환경에서는 GitHub Actions가 분석하므로 여기서는 아무것도 하지 않는다.
+// 서버 전용: 장 시간에 맞춘 전 종목 재분석 (로컬 실행용)
+// 정규장 중 30분마다 + 마감 직후 확정 분석 1회 (규칙은 marketClock.ts)
+// 배포(Vercel) 환경에서는 GitHub Actions가 분석하므로 여기서는 화면 표시용 정보만 계산한다.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getResult, getStatus, REMOTE_DATA, STALE_MS, startScan } from "./scanner";
+import { decideScan, getSession, isStale, nextScanTime, type SessionState } from "./marketClock";
+import { getResult, getStatus, REMOTE_DATA, startScan } from "./scanner";
 
 const SCAN_FILE = path.join(process.cwd(), ".data", "scan.json");
 const LOCK_FILE = path.join(process.cwd(), ".data", "scan.lock");
@@ -38,9 +40,8 @@ async function acquireLock(): Promise<boolean> {
 
 async function tick() {
   if (getStatus().state === "running") return;
-  const last = await lastScanAt();
-  if (Date.now() - last < STALE_MS) return;
-  if (await acquireLock()) startScan();
+  const d = decideScan(await getSession(), await lastScanAt());
+  if (d.run && (await acquireLock())) startScan();
 }
 
 export function ensureScheduler() {
@@ -49,17 +50,20 @@ export function ensureScheduler() {
   setTimeout(() => void tick(), 5_000);
 }
 
-/** GitHub Actions 예약 시각: 매시 7분 (.github/workflows/hourly-scan.yml 의 cron 과 맞출 것) */
-const CRON_MINUTE = 7;
+export interface ScanSchedule {
+  session: SessionState;
+  marketOpen: boolean;
+  nextScanAt: number | null; // null이면 다음 정규장 개장 후
+  stale: boolean; // 장중인데 75분 넘게 갱신 없음
+}
 
-export async function nextScanAt(): Promise<number | null> {
-  if (!LOCAL_SCHEDULER) {
-    const d = new Date();
-    d.setUTCSeconds(0, 0);
-    d.setUTCMinutes(CRON_MINUTE);
-    if (d.getTime() <= Date.now()) d.setUTCHours(d.getUTCHours() + 1);
-    return d.getTime(); // 실제 실행은 GitHub 사정으로 몇 분 늦어질 수 있음
-  }
-  const last = await lastScanAt();
-  return last ? last + STALE_MS : null;
+/** 화면 표시용 분석 일정 */
+export async function scanSchedule(): Promise<ScanSchedule> {
+  const [session, last] = await Promise.all([getSession(), lastScanAt()]);
+  return {
+    session: session.state,
+    marketOpen: session.state === "regular",
+    nextScanAt: nextScanTime(session, last),
+    stale: isStale(session, last),
+  };
 }

@@ -14,6 +14,8 @@ interface PicksResponse {
   scannedAt: number | null;
   nextScanAt: number | null;
   marketOpen: boolean;
+  session?: "pre" | "regular" | "post" | "closed";
+  stale?: boolean;
   top: Pick[] | null;
   excluded: Pick[];
   exits: PickExit[];
@@ -32,6 +34,12 @@ const SHORT: Record<string, string> = {
 };
 
 const LIVE_MS = 60_000;
+const SESSION_LABEL: Record<string, string> = {
+  regular: "정규장 · 실시간",
+  pre: "프리장 · 정규장 개장 전",
+  post: "애프터장 · 정규장 마감",
+  closed: "장 마감 · 마지막 가격 기준",
+};
 const hm = (t: number) => new Date(t).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 const dhm = (t: number) => new Date(t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -77,11 +85,15 @@ export default function PicksPage() {
       <div className="card px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
         <span className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${data?.marketOpen ? "bg-good animate-pulse" : "bg-muted"}`} />
-          <span className="text-text font-medium">{data?.marketOpen ? "실시간 · 장중" : "장 마감 · 마지막 가격 기준"}</span>
+          <span className="text-text font-medium">{SESSION_LABEL[data?.session ?? (data?.marketOpen ? "regular" : "closed")]}</span>
           {updatedAt && <span className="num">· 가격 {hm(updatedAt)} 갱신 (1분마다)</span>}
         </span>
-        {data?.scannedAt && <span className="num">전체 분석 {hm(data.scannedAt)}</span>}
-        {data?.nextScanAt && !running && <span className="num">다음 분석 {hm(Math.max(data.nextScanAt, data.serverTime))}</span>}
+        {data?.scannedAt && <span className="num">전체 분석 {dhm(data.scannedAt)}</span>}
+        {!running && data && (
+          <span className="num">
+            {data.nextScanAt ? `다음 분석 ${hm(Math.max(data.nextScanAt, data.serverTime))}` : "다음 분석: 정규장 개장 후 (장중 30분마다)"}
+          </span>
+        )}
         {data && data.candidates > 0 && <span className="num">과매도 후보 {data.candidates}개 평가</span>}
         {running && st && (
           <span className="flex items-center gap-2 ml-auto min-w-56">
@@ -93,12 +105,17 @@ export default function PicksPage() {
         )}
       </div>
       {st?.state === "error" && <div className="card p-4 text-sm text-bad">분석 실패: {st.error} — 다음 주기에 다시 시도합니다.</div>}
+      {data?.stale && !running && (
+        <div className="rounded-xl border border-warn/40 bg-warn/5 px-4 py-3 text-sm text-warn">
+          장중인데 전체 분석이 75분 넘게 갱신되지 않았습니다. 자동 분석이 지연되고 있습니다 — 가격은 계속 실시간으로 갱신됩니다.
+        </div>
+      )}
 
       {!data ? (
         <div className="card h-64 animate-pulse" />
       ) : top.length === 0 ? (
         <div className="card">
-          <Empty>{running ? "첫 분석을 진행하고 있습니다. 끝나면 Top 10이 표시됩니다 (5분 안팎)." : data.scannedAt == null ? "첫 분석 결과를 기다리고 있습니다. 매시간 자동으로 분석됩니다." : "지금은 추천 조건(65점 이상, 장기 보유 기준 통과)을 만족하는 종목이 없습니다."}</Empty>
+          <Empty>{running ? "첫 분석을 진행하고 있습니다. 끝나면 Top 10이 표시됩니다 (5분 안팎)." : data.scannedAt == null ? "첫 분석 결과를 기다리고 있습니다. 미국 정규장 동안 30분마다 자동으로 분석됩니다." : "지금은 추천 조건(65점 이상, 장기 보유 기준 통과)을 만족하는 종목이 없습니다."}</Empty>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -182,7 +199,7 @@ export default function PicksPage() {
       )}
 
       <p className="text-xs text-muted leading-relaxed">
-        가격과 가격에 따라 바뀌는 점수(기술적 과매도·할인율)는 1분마다, 하락 이유·재무를 포함한 전체 분석은 1시간마다 갱신됩니다. 추천은 공개 데이터로
+        가격과 가격에 따라 바뀌는 점수(기술적 과매도·할인율)는 1분마다, 하락 이유·재무를 포함한 전체 분석은 미국 정규장 동안 30분마다, 마감 직후 한 번 더 갱신됩니다(장 닫힌 시간·휴장일은 쉼). 추천은 공개 데이터로
         자동 계산한 결과이며 투자 권유가 아닙니다. 대상: 주가 $3 이상, 당일 거래대금 200만 달러 이상인 미국 상장 주식(한국 기업 제외).
       </p>
     </div>

@@ -18,16 +18,6 @@ const DATA_DIR = path.join(process.cwd(), ".data");
 const SCAN_FILE = path.join(DATA_DIR, "scan.json");
 const UNIVERSE_FILE = path.join(DATA_DIR, "universe.json");
 
-/** 전체 분석 주기: 1시간 */
-export const STALE_MS = 60 * 60 * 1000;
-
-/** 미국 정규장 여부 (평일 9:30~16:00, 뉴욕 시간) — 화면 표시용 */
-export function isMarketOpen(now = new Date()): boolean {
-  const ny = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(now);
-  const get = (t: string) => ny.find((x) => x.type === t)?.value ?? "";
-  const minutes = (Number(get("hour")) % 24) * 60 + Number(get("minute"));
-  return !["Sat", "Sun"].includes(get("weekday")) && minutes >= 9 * 60 + 30 && minutes < 16 * 60;
-}
 const BATCH = 20; // spark 최대 심볼 수
 const WORKERS = 4;
 const DEEP_RSI = 30; // 2단계 상세 분석 대상
