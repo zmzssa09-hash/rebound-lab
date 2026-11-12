@@ -1,11 +1,12 @@
 "use client";
+import Ago from "@/components/Ago";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import EtpWarning from "@/components/EtpWarning";
 import SwitchCalculator from "@/components/SwitchCalculator";
 import { Chip, Empty, PageHeader, Section, Stat } from "@/components/ui";
-import { daysUntil, money, pct, signedMoney, timeAgo, toneOf } from "@/lib/format";
+import { daysUntil, money, pct, signedMoney, toneOf } from "@/lib/format";
 import { setData, uid, useAppData, useHydrated } from "@/lib/store";
 import { CONCENTRATION_LIMIT, etpKind } from "@/lib/strategy";
 import type { Position } from "@/lib/types";
@@ -61,7 +62,7 @@ function Positions() {
         actions={
           <>
             <button className="btn" onClick={refresh} disabled={loading}>
-              {loading ? "불러오는 중…" : `시세 새로고침${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ""}`}
+              {loading ? "불러오는 중…" : <>시세 새로고침{fetchedAt && <> · <Ago t={fetchedAt} /></>}</>}
             </button>
             <button className="btn btn-primary" onClick={() => setEditing("new")}>+ 포지션 추가</button>
           </>

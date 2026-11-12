@@ -1,10 +1,11 @@
 "use client";
+import Ago from "@/components/Ago";
 import Link from "next/link";
 import { useState } from "react";
 import SymbolSearch from "@/components/SymbolSearch";
 import { Chip, Empty, PageHeader, RsiChip, TONE_CLASS } from "@/components/ui";
 import { TREND_LABEL, zoneStatus } from "@/lib/analysis";
-import { money, pct, timeAgo, toneOf } from "@/lib/format";
+import { money, pct, toneOf } from "@/lib/format";
 import { setData, uid, useAppData, useHydrated } from "@/lib/store";
 import type { WatchItem } from "@/lib/types";
 import { isQuote, useQuotes } from "@/lib/useQuotes";
@@ -26,7 +27,7 @@ export default function WatchlistPage() {
         desc="가격대마다 ‘왜 이 가격에서 관심을 갖는지’와 확인할 조건을 함께 적어 둡니다. 관심 가격은 무조건 매수 가격이 아닙니다."
         actions={
           <button className="btn" onClick={refresh} disabled={loading}>
-            {loading ? "불러오는 중…" : `시세 새로고침${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ""}`}
+            {loading ? "불러오는 중…" : <>시세 새로고침{fetchedAt && <> · <Ago t={fetchedAt} /></>}</>}
           </button>
         }
       />

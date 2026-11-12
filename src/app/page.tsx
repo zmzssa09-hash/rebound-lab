@@ -1,10 +1,11 @@
 "use client";
+import Ago from "@/components/Ago";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LoadSampleButton } from "@/components/DataTools";
 import { Empty, RsiChip, Section, TONE_CLASS } from "@/components/ui";
 import { TREND_LABEL, zoneStatus } from "@/lib/analysis";
-import { daysUntil, money, pct, signedMoney, timeAgo, toneOf } from "@/lib/format";
+import { daysUntil, money, pct, signedMoney, toneOf } from "@/lib/format";
 import Spark from "@/components/Spark";
 import { useMarket } from "@/lib/useMarket";
 import { useAppData, useHydrated } from "@/lib/store";
@@ -58,18 +59,34 @@ function MarketStrip() {
 /** 상위 추천 종목 */
 function TopPicks() {
   const [picks, setPicks] = useState<Pick[] | null>(null);
+  const [scannedAt, setScannedAt] = useState<number | null>(null);
   useEffect(() => {
     const load = () =>
       fetch("/api/picks", { cache: "no-store" })
         .then((r) => r.json())
-        .then((j) => setPicks(((j.top as Pick[] | null) ?? []).slice(0, 4)))
+        .then((j) => {
+          setPicks(((j.top as Pick[] | null) ?? []).slice(0, 4));
+          setScannedAt(j.scannedAt ?? null);
+        })
         .catch(() => setPicks((p) => p ?? []));
     load();
     const t = setInterval(load, 60_000); // 실시간 가격 1분마다
     return () => clearInterval(t);
   }, []);
   return (
-    <Section title="추천 종목 Top 4 · 실시간" right={<Link href="/picks" className="text-xs text-accent">Top 10 전체 →</Link>}>
+    <Section
+      title="추천 종목 Top 4 · 실시간"
+      right={
+        <span className="flex items-center gap-3 text-xs">
+          {scannedAt && (
+            <span className="text-muted">
+              분석 <Ago t={scannedAt} />
+            </span>
+          )}
+          <Link href="/picks" className="text-accent">Top 10 전체 →</Link>
+        </span>
+      }
+    >
       {picks == null ? (
         <div className="h-24 animate-pulse" />
       ) : picks.length === 0 ? (
@@ -238,7 +255,7 @@ export default function Dashboard() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-semibold">내 대시보드</h1>
             <button className="btn" onClick={refresh} disabled={loading}>
-              {loading ? "불러오는 중…" : `시세 새로고침${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ""}`}
+              {loading ? "불러오는 중…" : <>시세 새로고침{fetchedAt && <> · <Ago t={fetchedAt} /></>}</>}
             </button>
           </div>
 

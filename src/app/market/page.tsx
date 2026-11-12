@@ -1,4 +1,5 @@
 "use client";
+import Ago from "@/components/Ago";
 import Spark from "@/components/Spark";
 import { Chip, PageHeader, RsiChip, Section, TONE_CLASS } from "@/components/ui";
 import { pct, toneOf } from "@/lib/format";
@@ -123,7 +124,7 @@ export default function MarketPage() {
               </div>
               <p className="text-xs text-muted mt-3">
                 주가 $3 이상 미국 주식 {m.breadth.stocks.toLocaleString()}개 기준 ·{" "}
-                {new Date(m.breadth.scannedAt).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} 스캔
+                마지막 스캔 <Ago t={m.breadth.scannedAt} />
               </p>
             </Section>
           ) : (

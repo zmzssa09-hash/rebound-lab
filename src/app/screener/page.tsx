@@ -1,4 +1,5 @@
 "use client";
+import Ago from "@/components/Ago";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Chip, Empty, PageHeader, RsiChip, Stat, TONE_CLASS } from "@/components/ui";
@@ -207,7 +208,7 @@ export default function ScreenerPage() {
           </span>
           {data?.scannedAt && (
             <span className="text-xs text-muted">
-              {new Date(data.scannedAt).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} 스캔 · 장중 30분마다 자동 갱신
+              마지막 스캔 <Ago t={data.scannedAt} className="text-text" /> · 장중 30분마다 자동 갱신
             </span>
           )}
         </div>

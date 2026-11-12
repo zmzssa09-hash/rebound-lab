@@ -1,4 +1,5 @@
 "use client";
+import Ago from "@/components/Ago";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { KIND_TONE } from "@/components/DropReasonPanel";
@@ -86,9 +87,13 @@ export default function PicksPage() {
         <span className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${data?.marketOpen ? "bg-good animate-pulse" : "bg-muted"}`} />
           <span className="text-text font-medium">{SESSION_LABEL[data?.session ?? (data?.marketOpen ? "regular" : "closed")]}</span>
-          {updatedAt && <span className="num">· 가격 {hm(updatedAt)} 갱신 (1분마다)</span>}
+          {updatedAt && <span className="num">· 가격 <Ago t={updatedAt} /> 갱신 (1분마다)</span>}
         </span>
-        {data?.scannedAt && <span className="num">전체 분석 {dhm(data.scannedAt)}</span>}
+        {data?.scannedAt && (
+          <span className="num">
+            마지막 전체 분석 <Ago t={data.scannedAt} className="text-text font-medium" />
+          </span>
+        )}
         {!running && data && (
           <span className="num">
             {data.nextScanAt ? `다음 분석 ${hm(Math.max(data.nextScanAt, data.serverTime))}` : "다음 분석: 정규장 개장 후 (장중 30분마다)"}
