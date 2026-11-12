@@ -1,0 +1,52 @@
+# 매시간 미국 전 종목을 분석해서 결과를 'data' 브랜치에 저장한다.
+# 사이트(Vercel)는 DATA_BASE_URL 로 이 브랜치의 scan.json 을 읽는다.
+name: hourly-scan
+
+on:
+  schedule:
+    - cron: "7 * * * *" # 매시 7분 (UTC 기준, GitHub 사정으로 몇 분 늦어질 수 있음)
+  workflow_dispatch: # Actions 탭에서 수동 실행 가능
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hourly-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # 이전 결과(추천 이력 포함) 가져오기 — 첫 실행에는 data 브랜치가 없으므로 실패해도 계속
+      - name: Restore previous data
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: .data
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run full scan
+        run: npm run scan
+
+      # data 브랜치는 항상 커밋 1개만 유지 (저장소 용량이 계속 늘지 않도록)
+      - name: Publish data branch
+        run: |
+          cd .data
+          rm -rf .git scan.lock
+          git init -q -b data
+          git config user.name "rebound-lab-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
