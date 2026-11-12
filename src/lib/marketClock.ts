@@ -64,3 +64,37 @@ export function nextScanTime(session: Session, lastScanAt: number, now = Date.no
 export function isStale(session: Session, lastScanAt: number, now = Date.now()): boolean {
   return session.state === "regular" && now - lastScanAt > 75 * 60 * 1000;
 }
+
+/** 뉴욕 현지 시각(연·월·일·시·분)을 UTC ms로 변환 (서머타임 자동 반영) */
+function nyWallToUtc(y: number, mo: number, d: number, h: number, mi: number): number {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const p = nyParts(guess);
+  const wall = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi);
+  return guess - (wall - guess);
+}
+
+function nyParts(t: number) {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", weekday: "short", hourCycle: "h23",
+  });
+  const o: Record<string, string> = {};
+  for (const x of f.formatToParts(t)) o[x.type] = x.value;
+  return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, wd: o.weekday };
+}
+
+/**
+ * 다음 정규장 개장 시각.
+ * 야후 시간표가 미래 개장을 알려주면 그대로 쓰고(휴장일 반영),
+ * 아니면 다음 평일 오전 9:30(뉴욕)을 계산한다 — 이 경우 휴장일은 반영되지 않는다.
+ */
+export function nextRegularOpen(session: Session, now = Date.now()): { at: number; exact: boolean } {
+  if (session.regularStart && session.regularStart > now) return { at: session.regularStart, exact: true };
+  for (let i = 0; i < 8; i++) {
+    const p = nyParts(now + i * 86_400_000);
+    if (p.wd === "Sat" || p.wd === "Sun") continue;
+    const at = nyWallToUtc(p.y, p.mo, p.d, 9, 30);
+    if (at > now) return { at, exact: false };
+  }
+  return { at: now + 86_400_000, exact: false };
+}

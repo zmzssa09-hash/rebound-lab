@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import MarketStatusBanner from "@/components/MarketStatusBanner";
 import Nav from "@/components/Nav";
 import "./globals.css";
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={<div className="h-14 border-b border-line" />}>
           <Nav />
         </Suspense>
+        <MarketStatusBanner />
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6">{children}</main>
         <footer className="border-t border-line mt-10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 text-xs text-muted leading-relaxed">
