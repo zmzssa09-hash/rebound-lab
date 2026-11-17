@@ -227,7 +227,17 @@ export function zoneOf(z: Pick<BuyZones, "aggressiveMax" | "splitMax" | "watchMa
 }
 
 /** 초보자용 한 줄 행동 지침 */
-export function actionOf(input: { blocked: string | null; zone: ZoneKey | null; price: number; stop: number | null; rr: number | null; shortScore?: number | null }): {
+/** 실적 발표까지 남은 일수 (UNIX초 → 일, 지났으면 null) */
+export function earningsDaysLeft(earningsAt: number | null | undefined, now = Date.now()): number | null {
+  if (!earningsAt) return null;
+  const d = (earningsAt * 1000 - now) / 86_400_000;
+  return d >= -0.5 ? Math.max(0, Math.ceil(d)) : null;
+}
+
+/** 실적 발표 며칠 전부터 신규 매수를 막을지 */
+export const EARNINGS_BLOCK_DAYS = 3;
+
+export function actionOf(input: { blocked: string | null; zone: ZoneKey | null; price: number; stop: number | null; rr: number | null; shortScore?: number | null; earningsAt?: number | null }): {
   title: string;
   tone: Tone;
   text: string;
@@ -237,6 +247,15 @@ export function actionOf(input: { blocked: string | null; zone: ZoneKey | null; 
     return { title: "손절선 이탈", tone: "bad", text: "손절 기준 아래로 내려왔습니다. 보유 중이면 계획대로 정리하고, 새로 사지 않습니다." };
   if (!input.zone) return { title: "관찰", tone: "neutral", text: "적정가를 계산할 수 없어 매수 구간을 정하지 않았습니다. 직접 확인이 필요합니다." };
   const z = ZONE_INFO[input.zone];
+  const ed = earningsDaysLeft(input.earningsAt);
+  if (ed != null && ed <= EARNINGS_BLOCK_DAYS && input.zone !== "over") {
+    const when = new Date(input.earningsAt! * 1000).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
+    return {
+      title: "실적 발표 대기",
+      tone: "warn",
+      text: `${ed === 0 ? "오늘" : `${ed}일 뒤(${when})`} 실적 발표 — 발표 직후 주가가 하루에 10~20%씩 움직일 수 있습니다. 지금 사지 말고 발표 결과를 확인한 뒤 판단하세요. (${z.label})`,
+    };
+  }
   if ((input.zone === "aggressive" || input.zone === "split") && input.rr != null && input.rr < 1)
     return { title: "관찰", tone: "warn", text: `${z.label}이지만 손익비가 ${input.rr.toFixed(1)}로 낮습니다. 반등 공간보다 손절 폭이 커서 기다립니다.` };
   if (input.zone === "aggressive" && input.shortScore != null && input.shortScore < 50)

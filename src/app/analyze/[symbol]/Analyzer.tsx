@@ -119,7 +119,7 @@ export default function Analyzer({ symbol }: { symbol: string }) {
       </div>
 
       {/* 지금 사도 될까: 행동 지침 + 매수 구간 + 목표가·손절 */}
-      <TradePlanPanel plan={insight.data?.plan ?? null} price={snap.price} blocked={insight.data?.blocked ?? null} loading={insight.loading} shortScore={insight.data?.grades.short.score ?? null} />
+      <TradePlanPanel plan={insight.data?.plan ?? null} price={snap.price} blocked={insight.data?.blocked ?? null} loading={insight.loading} shortScore={insight.data?.grades.short.score ?? null} earningsAt={insight.data?.fundamentals?.earningsDate ?? null} />
 
       {/* 단기·장기 등급 */}
       <GradeBoxes grades={insight.data?.grades ?? null} loading={insight.loading} />

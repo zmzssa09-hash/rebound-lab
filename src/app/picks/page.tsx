@@ -7,8 +7,10 @@ import { Chip, Empty, PageHeader, RsiChip, TONE_CLASS } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
 import { bigMoneyKo } from "@/lib/ko";
 import { SCORE_ITEMS } from "@/lib/scorecard";
-import { actionOf, zoneOf } from "@/lib/tradePlan";
-import { ZoneLadder } from "@/components/TradePlanPanel";
+import { actionOf, earningsDaysLeft, zoneOf } from "@/lib/tradePlan";
+import { EarningsChip, ZoneLadder } from "@/components/TradePlanPanel";
+import PositionSizer, { SizingSettings } from "@/components/PositionSizer";
+import Term from "@/components/Term";
 import { setData, uid, useAppData } from "@/lib/store";
 import type { Pick, PickExit } from "@/lib/types";
 
@@ -81,7 +83,12 @@ export default function PicksPage() {
     <div className="space-y-5">
       <PageHeader
         title="추천 종목 Top 10"
-        desc="RSI 30 이하로 떨어진 미국 주식 중 하락 이유를 확인하고 100점 이중 투자전략 평가로 채점해, 단기 반등에 실패해도 장기 보유할 만한 기업만 골랐습니다. 한 번 추천된 종목은 조건이 유지되는 한 순위를 지킵니다."
+        desc={
+          <>
+            <Term k="RSI" /> 30 이하로 떨어진(<Term k="과매도" />) 미국 주식 중 하락 이유를 확인하고 100점 이중 투자전략 평가로 채점해, 단기 반등에 실패해도 장기 보유할 만한 기업만 골랐습니다. 한 번 추천된 종목은 조건이 유지되는 한 순위를 지킵니다.{" "}
+            <Link href="/guide" className="text-accent">처음이라면 3단계 안내부터 →</Link>
+          </>
+        }
       />
 
       {/* 상태 줄 */}
@@ -110,6 +117,11 @@ export default function PicksPage() {
             </span>
           </span>
         )}
+      </div>
+      <div className="card px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="text-sm font-medium">몇 주 살지 계산</span>
+        <SizingSettings compact />
+        <span className="text-[11px] text-muted">입력하면 카드마다 살 수량이 나옵니다 · 이 브라우저에만 저장</span>
       </div>
       {st?.state === "error" && <div className="card p-4 text-sm text-bad">분석 실패: {st.error} — 다음 주기에 다시 시도합니다.</div>}
       {data?.stale && !running && (
@@ -342,29 +354,34 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
 function PlanBox({ p, price }: { p: Pick; price: number }) {
   const plan = p.plan!;
   const zone = zoneOf(plan.zones, price);
-  const act = actionOf({ blocked: p.blocked ?? null, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore: p.shortGrade?.score ?? null });
+  const act = actionOf({ blocked: p.blocked ?? null, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore: p.shortGrade?.score ?? null, earningsAt: p.earningsDate ?? null });
   const rel = (x: number) => pct(((x - price) / price) * 100, 1);
+  const ed = earningsDaysLeft(p.earningsDate);
   return (
     <div className={`mt-3 rounded-lg border p-3 ${TONE_CLASS[act.tone]}`}>
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-wrap items-baseline gap-2">
         <span className="text-[11px] opacity-80 shrink-0">지금 해야 할 일</span>
         <span className="text-base font-bold text-text">{act.title}</span>
+        {ed != null && ed <= 14 && <span className="ml-auto"><EarningsChip days={ed} /></span>}
       </div>
       <p className="text-xs text-text/85 mt-0.5 leading-snug">{act.text}</p>
       <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] num">
         <div>
-          <div className="opacity-75">1차 목표</div>
+          <div className="opacity-75"><Term k="목표가">1차 목표</Term></div>
           <div className="text-text font-medium">{plan.t1 ? <>{money(plan.t1.price)} <span className="text-up">{rel(plan.t1.price)}</span></> : "–"}</div>
           {plan.t1?.hitRate != null && <div className="opacity-75">과거 도달 {(plan.t1.hitRate * 100).toFixed(0)}%</div>}
         </div>
         <div>
-          <div className="opacity-75">손절</div>
+          <div className="opacity-75"><Term k="손절" /></div>
           <div className="text-text font-medium">{plan.stop ? <>{money(plan.stop.price)} <span className="text-down">{rel(plan.stop.price)}</span></> : "–"}</div>
         </div>
         <div>
-          <div className="opacity-75">손익비</div>
+          <div className="opacity-75"><Term k="손익비" /></div>
           <div className="text-text font-medium">{plan.rr != null ? `${plan.rr.toFixed(1)} : 1` : "–"}</div>
         </div>
+      </div>
+      <div className="mt-1.5">
+        <PositionSizer price={price} stop={plan.stop?.price ?? null} compact />
       </div>
       {plan.zones && (
         <details className="mt-1.5">

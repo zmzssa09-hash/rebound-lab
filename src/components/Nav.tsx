@@ -1,17 +1,20 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import AlertBell from "./Alerts";
 import SymbolSearch from "./SymbolSearch";
 
 const LINKS = [
   { href: "/", label: "홈" },
   { href: "/picks", label: "추천 종목" },
+  { href: "/track", label: "성적표" },
   { href: "/market", label: "시장 흐름" },
   { href: "/screener", label: "스크리너" },
   { href: "/analyze", label: "종목 분석" },
   { href: "/watchlist", label: "관심 종목" },
   { href: "/positions", label: "포지션" },
   { href: "/strategy", label: "전략" },
+  { href: "/guide", label: "처음 오셨나요?" },
 ];
 
 export default function Nav() {
@@ -26,7 +29,7 @@ export default function Nav() {
           </svg>
           <span className="font-semibold tracking-tight">리바운드 랩</span>
         </Link>
-        <nav className="hidden lg:flex items-center gap-0.5 text-sm">
+        <nav className="hidden xl:flex items-center gap-0.5 text-sm">
           {LINKS.map((l) => (
             <Link
               key={l.href}
@@ -37,11 +40,14 @@ export default function Nav() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto w-full max-w-60">
-          <SymbolSearch compact />
+        <div className="ml-auto flex items-center gap-2 w-full max-w-72">
+          <div className="flex-1 min-w-0">
+            <SymbolSearch compact />
+          </div>
+          <AlertBell />
         </div>
       </div>
-      <nav className="lg:hidden flex overflow-x-auto gap-1 px-3 pb-2 text-sm">
+      <nav className="xl:hidden flex overflow-x-auto gap-1 px-3 pb-2 text-sm">
         {LINKS.map((l) => (
           <Link
             key={l.href}

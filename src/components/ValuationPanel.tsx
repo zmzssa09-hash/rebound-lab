@@ -1,4 +1,5 @@
 "use client";
+import Term from "@/components/Term";
 import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
 import type { HorizonGrade } from "@/lib/grades";
@@ -47,7 +48,7 @@ export function ValuationPanel({ v, price, sensitivity }: { v: Valuation | null;
     <Section title={`적정가 계산 — ${MODEL_NAME}`} right={<Chip tone={v.fairValue != null ? CONF_TONE[v.confidence.level] : "neutral"}>{v.confidence.label}</Chip>}>
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <div>
-          <div className="text-xs text-muted">기준 적정가</div>
+          <div className="text-xs text-muted">기준 <Term k="적정가" /></div>
           <div className="text-3xl font-semibold num">{v.fairValue != null ? money(v.fairValue) : "계산 불가"}</div>
         </div>
         <div>
@@ -105,7 +106,7 @@ export function ValuationPanel({ v, price, sensitivity }: { v: Valuation | null;
           <div className="num font-medium mt-0.5">{v.shares.used ? `${(v.shares.used / 1e6).toFixed(1)}M` : "확인 불가"}</div>
         </div>
         <div className="rounded-lg border border-line p-2">
-          <div className="text-muted">1년간 주식 수 변화</div>
+          <div className="text-muted">1년간 주식 수 변화 (<Term k="희석" />)</div>
           <div className={`num font-medium mt-0.5 ${v.shares.changeYoY != null && v.shares.changeYoY > 0.04 ? "text-bad" : ""}`}>
             {v.shares.changeYoY != null ? `${v.shares.changeYoY > 0 ? "+" : ""}${(v.shares.changeYoY * 100).toFixed(1)}%` : "확인 불가"}
           </div>

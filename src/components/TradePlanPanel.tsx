@@ -1,21 +1,27 @@
 "use client";
+import PositionSizer from "@/components/PositionSizer";
+import Term from "@/components/Term";
 import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import { money, pct } from "@/lib/format";
-import { actionOf, ZONE_INFO, zoneOf, type BuyZones, type TradePlan, type ZoneKey } from "@/lib/tradePlan";
+import { actionOf, earningsDaysLeft, ZONE_INFO, zoneOf, type BuyZones, type TradePlan, type ZoneKey } from "@/lib/tradePlan";
 import type { PickPlan } from "@/lib/types";
 
 const pr = (v: number | null) => (v == null ? "–" : `${(v * 100).toFixed(0)}%`);
 
 /** 지금 해야 할 일 + 매수 구간 + 단기 목표가·손절 */
-export function TradePlanPanel({ plan, price, blocked, loading, shortScore = null }: { plan: TradePlan | null; price: number; blocked: string | null; loading: boolean; shortScore?: number | null }) {
+export function TradePlanPanel({ plan, price, blocked, loading, shortScore = null, earningsAt = null }: { plan: TradePlan | null; price: number; blocked: string | null; loading: boolean; shortScore?: number | null; earningsAt?: number | null }) {
   if (loading || !plan) return <div className="card h-48 animate-pulse" />;
   const zone = zoneOf(plan.zones, price);
-  const act = actionOf({ blocked, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore });
+  const act = actionOf({ blocked, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore, earningsAt });
+  const ed = earningsDaysLeft(earningsAt);
 
   return (
     <Section title="매매 계획 — 지금 사도 될까?" right={<span className="text-xs text-muted">실시간 가격 기준</span>}>
       <div className={`rounded-xl border p-4 ${TONE_CLASS[act.tone]}`}>
-        <div className="text-xs opacity-80">지금 해야 할 일</div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="opacity-80">지금 해야 할 일</span>
+          {ed != null && ed <= 14 && <EarningsChip days={ed} />}
+        </div>
         <div className="text-2xl font-bold text-text mt-0.5">{act.title}</div>
         <p className="text-sm text-text/90 mt-1 leading-relaxed">{act.text}</p>
       </div>
@@ -23,20 +29,20 @@ export function TradePlanPanel({ plan, price, blocked, loading, shortScore = nul
       <div className="grid gap-4 lg:grid-cols-2 mt-4">
         {/* 장기: 매수 구간 */}
         <div>
-          <div className="text-sm font-semibold">매수 구간 <span className="text-xs text-muted font-normal">장기 3~12개월 · 적정가 기준</span></div>
+          <div className="text-sm font-semibold"><Term k="매수 구간" /> <span className="text-xs text-muted font-normal">장기 3~12개월 · 적정가 기준</span></div>
           {plan.zones ? <ZoneLadder z={plan.zones} price={price} current={zone} stop={plan.stop?.price ?? null} /> : <p className="text-sm text-muted mt-2">적정가를 계산할 수 없어 매수 구간을 정하지 않았습니다.</p>}
         </div>
 
         {/* 단기: 목표가·손절 */}
         <div>
-          <div className="text-sm font-semibold">단기 목표가와 손절선 <span className="text-xs text-muted font-normal">1~4주 · 지지·저항선 기준</span></div>
+          <div className="text-sm font-semibold"><Term k="목표가" />와 <Term k="손절">손절선</Term> <span className="text-xs text-muted font-normal">1~4주 · 지지·저항선 기준</span></div>
           <div className="mt-2 space-y-1.5 text-sm">
             {plan.t1 && <TargetRow name="1차 목표" t={plan.t1} price={price} />}
             {plan.t2 && <TargetRow name="2차 목표" t={plan.t2} price={price} />}
             {plan.stop && (
               <div className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-bad w-16 shrink-0">손절</span>
+                  <span className="font-medium text-bad w-16 shrink-0"><Term k="손절" /></span>
                   <span className="num font-semibold">{money(plan.stop.price)}</span>
                   <span className="num text-xs text-bad">{pct(((plan.stop.price - price) / price) * 100, 1)}</span>
                 </div>
@@ -45,13 +51,18 @@ export function TradePlanPanel({ plan, price, blocked, loading, shortScore = nul
             )}
             {plan.rr != null && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-muted text-xs">손익비 (1차 목표 상승폭 ÷ 손절폭)</span>
+                <span className="text-muted text-xs"><Term k="손익비" /> (1차 목표 상승폭 ÷ 손절폭)</span>
                 <Chip tone={plan.rr >= 2 ? "good" : plan.rr >= 1.5 ? "warn" : "bad"}>{plan.rr.toFixed(1)} : 1</Chip>
                 <span className="text-[11px] text-muted">{plan.rr >= 2 ? "유리" : plan.rr >= 1.5 ? "보통" : "불리 — 1.5 이상일 때 매매"}</span>
               </div>
             )}
           </div>
         </div>
+      </div>
+
+      {/* 몇 주 살까 */}
+      <div className="mt-4">
+        <PositionSizer price={price} stop={plan.stop?.price ?? null} />
       </div>
 
       {plan.notes.length > 0 && (
@@ -61,7 +72,7 @@ export function TradePlanPanel({ plan, price, blocked, loading, shortScore = nul
       )}
 
       <details className="mt-3">
-        <summary className="text-xs text-accent cursor-pointer select-none">지지선·저항선·매물대 보기</summary>
+        <summary className="text-xs text-accent cursor-pointer select-none"><Term k="지지선" />·<Term k="저항선" />·<Term k="매물대" /> 보기</summary>
         <div className="grid gap-3 sm:grid-cols-2 mt-2 text-xs">
           <LevelList title="위쪽 저항선" items={plan.resistances} price={price} />
           <LevelList title="아래쪽 지지선" items={plan.supports} price={price} />
@@ -145,10 +156,19 @@ export function ZoneLadder({ z, price, current, stop, compact = false }: { z: Bu
       )}
       {!compact && "marginWhy" in z && (
         <div className="text-[11px] text-muted px-1">
-          안전마진 {Math.round(z.margin * 100)}% ({z.marginWhy.join(" · ")}) → 매수가 = 기준 적정가 {money(z.fair)} × (1 − {Math.round(z.margin * 100)}%) = {money(z.buyPrice)}
+          <Term k="안전마진" /> {Math.round(z.margin * 100)}% ({z.marginWhy.join(" · ")}) → 매수가 = 기준 적정가 {money(z.fair)} × (1 − {Math.round(z.margin * 100)}%) = {money(z.buyPrice)}
           {z.bear != null && <> · 보수적 적정가 {money(z.bear)}</>}
         </div>
       )}
     </div>
+  );
+}
+
+/** 실적 발표 D-day 배지 */
+export function EarningsChip({ days }: { days: number }) {
+  return (
+    <Chip tone={days <= 3 ? "bad" : "warn"}>
+      <Term k="실적 발표">실적 발표</Term> {days === 0 ? "오늘" : `D-${days}`}
+    </Chip>
   );
 }

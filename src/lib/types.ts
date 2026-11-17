@@ -153,6 +153,8 @@ export interface AppData {
   watchlist: WatchItem[];
   research: Record<string, ResearchNote>;
   pretrade: Record<string, boolean>;
+  /** 몇 주 살지 계산기 설정 (달러) */
+  sizing?: { account: number; riskPct: number; maxWeight: number };
 }
 
 // ===== 추천 종목 =====
@@ -192,6 +194,7 @@ export interface Pick {
   confidence?: { level: "high" | "mid" | "low"; label: string } | null;
   plan?: PickPlan | null;
   blocked?: string | null;
+  earningsDate?: number | null; // 다음 실적 발표 (UNIX초)
   resilienceSummary: string;
   // 순위 추적 (Top 10에 든 종목만)
   rank?: number;

@@ -8,7 +8,8 @@ import { computeSnapshot, summarize } from "./analysis";
 import type { HorizonGrade } from "./grades";
 import { autoFinal, buildInsight } from "./insight";
 import { koreanName } from "./naver";
-import { activeSymbols, selectTop } from "./ranking";
+import { activeSymbols, loadHistory, selectTop } from "./ranking";
+import { seedTrackFromHistory, updateTrack } from "./track";
 import { LONG_TERM_MIN, RED_FLAGS } from "./scorecard";
 import type { Bar, Pick, PickExit, Tone, Trend } from "./types";
 import { fetchChart } from "./yahoo";
@@ -308,6 +309,7 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
     },
     confidence: ins.valuation.fairValue != null ? { level: ins.valuation.confidence.level, label: ins.valuation.confidence.label } : null,
     blocked: ins.blocked,
+    earningsDate: f?.earningsDate ?? null,
     plan: {
       t1: ins.plan.t1 && { price: ins.plan.t1.price, pct: ins.plan.t1.pct, basis: ins.plan.t1.basis, hitRate: ins.plan.t1.hitRate, medianDays: ins.plan.t1.medianDays },
       t2: ins.plan.t2 && { price: ins.plan.t2.price, pct: ins.plan.t2.pct, basis: ins.plan.t2.basis, hitRate: ins.plan.t2.hitRate },
@@ -445,6 +447,15 @@ async function runScan() {
   await Promise.all(Array.from({ length: 3 }, pickWorker));
   picks.sort((a, b) => Number(a.excluded) - Number(b.excluded) || b.total - a.total);
   const { top, exits } = await selectTop(picks);
+
+  // 추천 성적표 갱신 (실패해도 분석 결과는 저장)
+  try {
+    const h = await loadHistory();
+    await seedTrackFromHistory(Object.values(h.active), h.exits);
+    await updateTrack(top, exits);
+  } catch (e) {
+    console.error("성적표 갱신 실패:", (e as Error).message);
+  }
 
   const result: ScanResult = { scannedAt: Date.now(), universe: universe.length, rows, failed: universe.length - rows.length, picks, top, exits };
   S.result = result;
