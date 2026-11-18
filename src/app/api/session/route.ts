@@ -1,6 +1,6 @@
 import { computeSnapshot } from "@/lib/analysis";
 import { getSession, nextRegularOpen } from "@/lib/marketClock";
-import { fetchChart } from "@/lib/yahoo";
+import { fetchChart, fetchUsdKrw } from "@/lib/yahoo";
 
 /** 시장 국면: S&P 500(SPY)이 200일선 위인지 */
 async function regime() {
@@ -23,7 +23,7 @@ async function regime() {
 
 export async function GET() {
   const now = Date.now();
-  const [s, reg] = await Promise.all([getSession(now), regime()]);
+  const [s, reg, krw] = await Promise.all([getSession(now), regime(), fetchUsdKrw()]);
   const open = s.state === "regular" ? null : nextRegularOpen(s, now);
   return Response.json({
     state: s.state,
@@ -31,6 +31,7 @@ export async function GET() {
     nextOpenAt: open?.at ?? null,
     nextOpenExact: open?.exact ?? false,
     regime: reg,
+    usdkrw: krw,
     serverTime: now,
   });
 }

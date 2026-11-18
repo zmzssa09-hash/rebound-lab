@@ -62,7 +62,7 @@ export function TradePlanPanel({ plan, price, blocked, loading, shortScore = nul
 
       {/* 몇 주 살까 */}
       <div className="mt-4">
-        <PositionSizer price={price} stop={plan.stop?.price ?? null} />
+        <PositionSizer price={price} stop={plan.stop?.price ?? null} target={plan.t1?.price ?? null} />
       </div>
 
       {plan.notes.length > 0 && (

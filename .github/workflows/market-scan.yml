@@ -43,6 +43,8 @@ jobs:
       - name: Scan (장 시간 규칙에 따라 실행 또는 건너뜀)
         id: scan
         run: npx tsx scripts/scan.ts ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
+        env:
+          PUSH_ENABLED: "1" # 분석이 끝나면 휴대폰 푸시(ntfy) 발송
 
       # data 브랜치는 항상 커밋 1개만 유지 (저장소 용량이 계속 늘지 않도록)
       - name: Publish data branch

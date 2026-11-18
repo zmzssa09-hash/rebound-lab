@@ -7,6 +7,7 @@
 // 설정과 알림 기록은 이 브라우저(localStorage)에만 저장한다.
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import PhonePush from "@/components/PhonePush";
 import { money } from "@/lib/format";
 import { useAppData } from "@/lib/store";
 import { zoneOf, ZONE_INFO } from "@/lib/tradePlan";
@@ -209,6 +210,9 @@ export default function AlertBell() {
             <li>• 추천 Top 10에 새 종목 진입</li>
           </ul>
           <p className="text-[11px] text-muted mt-2">이 사이트가 브라우저에 열려 있을 때(다른 탭이어도) 1분마다 확인합니다. 같은 알림은 하루 한 번만 보냅니다.</p>
+          <div className="mt-3 border-t border-line pt-3">
+            <PhonePush compact />
+          </div>
           {st.recent.length > 0 && (
             <div className="mt-3 border-t border-line pt-2">
               <div className="text-xs font-medium mb-1">최근 알림</div>

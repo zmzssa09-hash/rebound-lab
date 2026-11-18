@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import PhonePush from "@/components/PhonePush";
 import { SizingSettings } from "@/components/PositionSizer";
 import Term from "@/components/Term";
 import { PageHeader, Section } from "@/components/ui";
@@ -109,12 +110,18 @@ export default function GuidePage() {
             <b>2차 목표가 또는 적정가 근처에서 나머지를 팝니다.</b> 장기로 가져갈 생각이면 장기 등급이 B 이상인 종목만 남기세요.
           </li>
           <li>
+            <b>세금을 기억하세요.</b> 1년 동안 해외주식으로 번 순이익 중 250만 원을 넘는 부분에 22%(지방세 포함) 양도소득세가 붙고, 다음 해 5월에 직접 신고합니다. 손실 난 거래와 상계되니 매매 기록을 남겨 두세요. 몇 주 살지 계산기에 세후 수익이 나옵니다.
+          </li>
+          <li>
             <b>Top 10에서 빠지면 다시 확인합니다.</b> 빠진 이유가 &quot;반등 목표 달성&quot;이면 이익 실현을, &quot;회피 신호&quot;나 &quot;점수 하락&quot;이면 정리를 검토하세요.
           </li>
         </ol>
         <Box tone="good">
           화면을 계속 볼 수 없다면 오른쪽 위 <b>🔔 종 모양 버튼</b>으로 알림을 켜세요. 관심·보유 종목이 매수 구간에 들어오거나 목표가·손절가에 닿으면 알려드립니다. (사이트가 브라우저에 열려
           있어야 합니다. 다른 탭이어도 괜찮습니다.)
+        </Box>
+        <Box>
+          <PhonePush />
         </Box>
       </Step>
 

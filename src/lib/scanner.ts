@@ -10,6 +10,7 @@ import { autoFinal, buildInsight } from "./insight";
 import { koreanName } from "./naver";
 import { activeSymbols, loadHistory, selectTop } from "./ranking";
 import { seedTrackFromHistory, updateTrack } from "./track";
+import { updatePaper, type PaperTrade } from "./paper";
 import { LONG_TERM_MIN, RED_FLAGS } from "./scorecard";
 import type { Bar, Pick, PickExit, Tone, Trend } from "./types";
 import { fetchChart } from "./yahoo";
@@ -70,7 +71,7 @@ export interface ScanStatus {
 
 // dev 서버 HMR에서도 상태가 유지되도록 globalThis에 보관
 const g = globalThis as unknown as {
-  __scan?: { status: ScanStatus; result: ScanResult | null; loaded: boolean; mtime: number };
+  __scan?: { status: ScanStatus; result: ScanResult | null; loaded: boolean; mtime: number; paperTrades?: PaperTrade[]; newExits?: PickExit[] };
 };
 const S = (g.__scan ??= {
   status: { state: "idle", phase: "", done: 0, total: 0, startedAt: null, error: null },
@@ -446,7 +447,9 @@ async function runScan() {
   };
   await Promise.all(Array.from({ length: 3 }, pickWorker));
   picks.sort((a, b) => Number(a.excluded) - Number(b.excluded) || b.total - a.total);
+  const selectedAt = Date.now();
   const { top, exits } = await selectTop(picks);
+  const newExits = exits.filter((e) => e.exitedAt >= selectedAt);
 
   // 추천 성적표 갱신 (실패해도 분석 결과는 저장)
   try {
@@ -456,6 +459,14 @@ async function runScan() {
   } catch (e) {
     console.error("성적표 갱신 실패:", (e as Error).message);
   }
+  // 가상 포트폴리오 자동 매매
+  try {
+    const r = await updatePaper(top, newExits);
+    S.paperTrades = r.newTrades;
+  } catch (e) {
+    console.error("가상 포트폴리오 갱신 실패:", (e as Error).message);
+  }
+  S.newExits = newExits;
 
   const result: ScanResult = { scannedAt: Date.now(), universe: universe.length, rows, failed: universe.length - rows.length, picks, top, exits };
   S.result = result;
@@ -464,4 +475,9 @@ async function runScan() {
   await writeFile(SCAN_FILE, JSON.stringify(result));
   S.mtime = (await stat(SCAN_FILE)).mtimeMs;
   S.status = { state: "idle", phase: "완료", done: 0, total: 0, startedAt: null, error: null };
+}
+
+/** 직전 분석에서 생긴 변화 (휴대폰 알림용) */
+export function lastScanEvents(): { paperTrades: PaperTrade[]; newExits: PickExit[] } {
+  return { paperTrades: S.paperTrades ?? [], newExits: S.newExits ?? [] };
 }

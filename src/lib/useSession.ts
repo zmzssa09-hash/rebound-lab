@@ -17,6 +17,7 @@ export interface SessionInfo {
   nextOpenAt: number | null;
   nextOpenExact: boolean;
   regime: Regime | null;
+  usdkrw: number | null; // 달러-원 환율
   serverTime: number;
 }
 
@@ -63,4 +64,9 @@ export function useSession(): SessionInfo | null {
 export function useBearMarket(): boolean {
   const s = useSession();
   return s?.regime ? !s.regime.above200 : false;
+}
+
+/** 달러-원 환율 (모르면 null) */
+export function useUsdKrw(): number | null {
+  return useSession()?.usdkrw ?? null;
 }

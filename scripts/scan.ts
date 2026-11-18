@@ -6,7 +6,8 @@ import { appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { decideScan, getSession } from "../src/lib/marketClock";
-import { getResult, runScanOnce } from "../src/lib/scanner";
+import { buildDigest, sendPush } from "../src/lib/notify";
+import { getResult, lastScanEvents, runScanOnce } from "../src/lib/scanner";
 
 const force = process.argv.includes("--force");
 
@@ -36,6 +37,7 @@ async function main() {
     return;
   }
 
+  const prevTop = (await getResult())?.top ?? []; // 알림용: 직전 Top 10
   const started = Date.now();
   await runScanOnce((s) => console.log(`[${Math.round((Date.now() - started) / 1000)}s] ${s.phase} ${s.done}/${s.total}`));
   const r = await getResult();
@@ -49,6 +51,20 @@ async function main() {
     return;
   }
   setOutput(true);
+
+  // 휴대폰 푸시 알림 (GitHub Actions에서만: PUSH_ENABLED=1)
+  const ev = lastScanEvents();
+  const digest = buildDigest({ prevTop, top: r.top, newExits: ev.newExits, paperTrades: ev.paperTrades });
+  if (!digest) console.log("알림: 새 소식 없음");
+  else if (process.env.PUSH_ENABLED !== "1") console.log(`알림(로컬 실행이라 보내지 않음): ${digest.title}\n${digest.message}`);
+  else {
+    try {
+      await sendPush(digest);
+      console.log(`알림 보냄: ${digest.title}`);
+    } catch (e) {
+      console.error("알림 실패:", (e as Error).message);
+    }
+  }
 }
 
 main()

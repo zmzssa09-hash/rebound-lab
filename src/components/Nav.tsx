@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/", label: "홈" },
   { href: "/picks", label: "추천 종목" },
   { href: "/track", label: "성적표" },
+  { href: "/paper", label: "모의투자" },
   { href: "/market", label: "시장 흐름" },
   { href: "/screener", label: "스크리너" },
   { href: "/analyze", label: "종목 분석" },

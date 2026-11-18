@@ -37,3 +37,13 @@ export function marketTime(sec: number) {
     minute: "2-digit",
   });
 }
+
+/** 원화 금액을 읽기 쉽게: 1.23억 원 / 123만 원 / 5,400원 */
+export function krw(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "–";
+  const a = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (a >= 1e8) return `${sign}${(a / 1e8).toFixed(a >= 1e9 ? 1 : 2)}억 원`;
+  if (a >= 1e4) return `${sign}${Math.round(a / 1e4).toLocaleString("ko-KR")}만 원`;
+  return `${sign}${Math.round(a).toLocaleString("ko-KR")}원`;
+}

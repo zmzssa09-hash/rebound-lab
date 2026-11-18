@@ -154,7 +154,7 @@ export interface AppData {
   research: Record<string, ResearchNote>;
   pretrade: Record<string, boolean>;
   /** 몇 주 살지 계산기 설정 (달러) */
-  sizing?: { account: number; riskPct: number; maxWeight: number };
+  sizing?: { account: number; riskPct: number; maxWeight: number; unit?: "USD" | "KRW"; gainsKrw?: number };
 }
 
 // ===== 추천 종목 =====

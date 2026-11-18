@@ -14,6 +14,7 @@ import { useChart, useInsight } from "@/lib/useQuotes";
 import DropReasonPanel from "@/components/DropReasonPanel";
 import { GradeBoxes, ResiliencePanel, ValuationPanel } from "@/components/ValuationPanel";
 import { TradePlanPanel } from "@/components/TradePlanPanel";
+import Krw from "@/components/Krw";
 
 export default function Analyzer({ symbol }: { symbol: string }) {
   const { data, error, loading } = useChart(symbol);
@@ -90,6 +91,7 @@ export default function Analyzer({ symbol }: { symbol: string }) {
           </h1>
           <div className="flex items-baseline gap-3 mt-1 num">
             <span className="text-3xl font-semibold">{money(snap.price, cur)}</span>
+            <Krw usd={snap.price} className="text-sm text-muted" paren={false} />
             <span className={`text-lg ${toneOf(snap.changePct)}`}>{pct(snap.changePct)}</span>
             <span className="text-xs text-muted">{marketTime(meta.marketTime)} 기준 · 1분마다 자동 갱신</span>
           </div>

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import EtpWarning from "@/components/EtpWarning";
 import SwitchCalculator from "@/components/SwitchCalculator";
+import SectorMix from "@/components/SectorMix";
 import { Chip, Empty, PageHeader, Section, Stat } from "@/components/ui";
 import { daysUntil, money, pct, signedMoney, toneOf } from "@/lib/format";
 import { setData, uid, useAppData, useHydrated } from "@/lib/store";
@@ -233,6 +234,8 @@ function Positions() {
       {etps.map((s) => (
         <EtpWarning key={s} symbol={s} kind={etpKind(s)!} />
       ))}
+
+      <SectorMix rows={rows.map((r) => ({ symbol: r.p.symbol, value: r.value ?? r.cost }))} />
 
       <SwitchCalculator positions={app.positions} quotes={quotes} cash={app.cash} />
     </div>

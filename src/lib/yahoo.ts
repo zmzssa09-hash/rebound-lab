@@ -144,3 +144,24 @@ export async function searchSymbols(q: string): Promise<SearchHit[]> {
       type: String(x.typeDisp ?? x.quoteType ?? ""),
     }));
 }
+
+/** 달러-원 환율 (원화 환산 표시용 — 한국 주식 시세가 아니라 환율만 조회). 10분 캐시 */
+const FX = globalThis as unknown as { __usdkrw?: { at: number; rate: number | null } };
+export async function fetchUsdKrw(): Promise<number | null> {
+  const c = FX.__usdkrw;
+  if (c && Date.now() - c.at < 10 * 60_000) return c.rate;
+  try {
+    const res = await fetch("https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?range=1d&interval=1d", {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+      cache: "no-store",
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const j: any = await res.json();
+    const rate = Number(j?.chart?.result?.[0]?.meta?.regularMarketPrice);
+    const ok = rate > 500 && rate < 3000 ? rate : null;
+    FX.__usdkrw = { at: Date.now(), rate: ok };
+    return ok;
+  } catch {
+    return c?.rate ?? null;
+  }
+}

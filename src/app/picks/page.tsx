@@ -11,6 +11,8 @@ import { actionOf, earningsDaysLeft, zoneOf } from "@/lib/tradePlan";
 import { EarningsChip, ZoneLadder } from "@/components/TradePlanPanel";
 import PositionSizer, { SizingSettings } from "@/components/PositionSizer";
 import Term from "@/components/Term";
+import Krw from "@/components/Krw";
+import { sectorCounts, useSectors } from "@/lib/useSectors";
 import { setData, uid, useAppData } from "@/lib/store";
 import type { Pick, PickExit } from "@/lib/types";
 
@@ -77,6 +79,13 @@ export default function PicksPage() {
     setData((d) => (d.watchlist.some((w) => w.symbol === symbol) ? d : { ...d, watchlist: [...d.watchlist, { id: uid(), symbol, zones: [] }] }));
 
   const top = data?.top ?? [];
+  const heldSectors = useSectors(app.positions.map((p) => p.symbol));
+  const heldBySector = new Map<string, string[]>();
+  for (const p of app.positions) {
+    const sec = heldSectors[p.symbol];
+    if (sec) heldBySector.set(sec, [...(heldBySector.get(sec) ?? []), p.symbol]);
+  }
+  const crowded = sectorCounts(top.map((p) => p.sectorKo)).filter(([, n]) => n >= 3);
   const st = data?.status;
 
   return (
@@ -123,6 +132,12 @@ export default function PicksPage() {
         <SizingSettings compact />
         <span className="text-[11px] text-muted">입력하면 카드마다 살 수량이 나옵니다 · 이 브라우저에만 저장</span>
       </div>
+      {crowded.length > 0 && (
+        <div className="rounded-xl border border-warn/40 bg-warn/5 px-4 py-3 text-sm">
+          <b className="text-warn">업종 쏠림</b> — Top 10 중 {crowded.map(([s, n]) => `${s} ${n}종목`).join(", ")}. 같은 업종은 함께 오르고 함께 떨어지니, 여러 개를 사려면{" "}
+          <b>같은 업종은 2종목까지만</b> 고르세요.
+        </div>
+      )}
       {st?.state === "error" && <div className="card p-4 text-sm text-bad">분석 실패: {st.error} — 다음 주기에 다시 시도합니다.</div>}
       {data?.stale && !running && (
         <div className="rounded-xl border border-warn/40 bg-warn/5 px-4 py-3 text-sm text-warn">
@@ -139,7 +154,13 @@ export default function PicksPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {top.map((p) => (
-            <PickCard key={p.symbol} p={p} watched={watched.has(p.symbol)} onWatch={() => addWatch(p.symbol)} />
+            <PickCard
+              key={p.symbol}
+              p={p}
+              watched={watched.has(p.symbol)}
+              onWatch={() => addWatch(p.symbol)}
+              sameSectorHeld={(p.sectorKo && heldBySector.get(p.sectorKo)?.filter((x) => x !== p.symbol)) || []}
+            />
           ))}
         </div>
       )}
@@ -233,7 +254,7 @@ function RankMove({ p }: { p: Pick }) {
   return <span className="text-[11px] text-muted">–</span>;
 }
 
-function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch: () => void }) {
+function PickCard({ p, watched, onWatch, sameSectorHeld }: { p: Pick; watched: boolean; onWatch: () => void; sameSectorHeld: string[] }) {
   const price = p.live?.price ?? p.price;
   const total = p.live?.total ?? p.total;
   const rsi = p.live?.rsi ?? p.rsi;
@@ -265,7 +286,10 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-sm num">
-        <span className="font-semibold">{money(price)}</span>
+        <span className="font-semibold">
+          {money(price)}
+          <Krw usd={price} className="text-muted text-xs font-normal" />
+        </span>
         <span className={toneOf(chg)}>{pct(chg)}</span>
         <RsiChip value={rsi} />
         {upside != null && (
@@ -279,6 +303,14 @@ function PickCard({ p, watched, onWatch }: { p: Pick; watched: boolean; onWatch:
 
       {/* 지금 해야 할 일 */}
       {p.plan && <PlanBox p={p} price={price} />}
+      {sameSectorHeld.length >= 2 && (
+        <div className="mt-2 rounded-md border border-warn/40 bg-warn/5 px-3 py-1.5 text-xs text-warn">
+          이미 같은 업종({p.sectorKo}) {sameSectorHeld.length}종목 보유 중 ({sameSectorHeld.join(", ")}) — 더 사면 한 업종에 쏠립니다.
+        </div>
+      )}
+      {sameSectorHeld.length === 1 && (
+        <div className="mt-2 text-[11px] text-muted">같은 업종({p.sectorKo}) {sameSectorHeld[0]} 보유 중 — 이 업종은 이 종목까지만 권장</div>
+      )}
 
       {/* 단기·장기 등급 */}
       {p.shortGrade && p.longGrade && (

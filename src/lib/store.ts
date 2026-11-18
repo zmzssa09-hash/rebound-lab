@@ -39,7 +39,13 @@ export function normalize(x: unknown): AppData {
     pretrade: d.pretrade && typeof d.pretrade === "object" ? d.pretrade : {},
     sizing:
       d.sizing && typeof d.sizing === "object"
-        ? { account: Number(d.sizing.account) || 0, riskPct: Number(d.sizing.riskPct) || 1, maxWeight: Number(d.sizing.maxWeight) || 20 }
+        ? {
+            account: Number(d.sizing.account) || 0,
+            riskPct: Number(d.sizing.riskPct) || 1,
+            maxWeight: Number(d.sizing.maxWeight) || 20,
+            unit: d.sizing.unit === "KRW" ? "KRW" : "USD",
+            gainsKrw: Number(d.sizing.gainsKrw) || 0,
+          }
         : undefined,
   };
 }
