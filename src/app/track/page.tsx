@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Ago from "@/components/Ago";
+import PerfTabs from "@/components/PerfTabs";
 import Term from "@/components/Term";
 import { Chip, Empty, PageHeader, Section } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
@@ -56,6 +57,7 @@ export default function TrackPage() {
 
   return (
     <div className="space-y-5">
+      <PerfTabs />
       <PageHeader
         title="추천 성적표"
         desc={

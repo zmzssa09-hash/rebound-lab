@@ -27,9 +27,26 @@ function actionTitle(p: Pick): string | null {
 }
 
 /** 이번 분석에서 생긴 변화를 한 통의 알림 글로 정리 (변화가 없으면 null) */
-export function buildDigest(input: { prevTop: Pick[]; top: Pick[]; newExits: PickExit[]; paperTrades: PaperTrade[] }): { title: string; message: string } | null {
+export function buildDigest(input: {
+  prevTop: Pick[];
+  top: Pick[];
+  newExits: PickExit[];
+  paperTrades: PaperTrade[];
+  /** 종목별 알림 기록 (같은 알림은 24시간에 한 번) — 호출 후 갱신된다 */
+  seen?: Record<string, number>;
+  now?: number;
+}): { title: string; message: string } | null {
   const prev = new Map(input.prevTop.map((p) => [p.symbol, p]));
   const lines: string[] = [];
+  const now = input.now ?? Date.now();
+  const seen = input.seen ?? {};
+  for (const k of Object.keys(seen)) if (now - seen[k] > 3 * 86_400_000) delete seen[k];
+  /** 같은 종목·같은 종류 알림이 24시간 안에 이미 나갔으면 건너뜀 */
+  const once = (key: string) => {
+    if (seen[key] && now - seen[key] < 86_400_000) return false;
+    seen[key] = now;
+    return true;
+  };
   const name = (p: { nameKo: string | null; name: string; symbol: string }) => `${p.nameKo ?? p.name}(${p.symbol})`;
 
   for (const p of input.top) {
@@ -41,12 +58,12 @@ export function buildDigest(input: { prevTop: Pick[]; top: Pick[]; newExits: Pic
     }
     const nowAct = actionTitle(p);
     const prevAct = actionTitle(before);
-    if (nowAct && BUY_TITLES.has(nowAct) && !(prevAct && BUY_TITLES.has(prevAct))) lines.push(`🟢 매수 구간 진입: ${name(p)} ${money(price)} — ${nowAct}`);
+    if (nowAct && BUY_TITLES.has(nowAct) && !(prevAct && BUY_TITLES.has(prevAct)) && once(`zone-${p.symbol}`)) lines.push(`🟢 매수 구간 진입: ${name(p)} ${money(price)} — ${nowAct}`);
     const stop = p.plan?.stop?.price;
     const prevPrice = before.live?.price ?? before.price;
-    if (stop && price <= stop && prevPrice > stop) lines.push(`🔴 손절선 도달: ${name(p)} ${money(price)} ≤ ${money(stop)}`);
+    if (stop && price <= stop && prevPrice > stop && once(`stop-${p.symbol}`)) lines.push(`🔴 손절선 도달: ${name(p)} ${money(price)} ≤ ${money(stop)}`);
     const t1 = p.plan?.t1?.price;
-    if (t1 && price >= t1 && prevPrice < t1) lines.push(`🎯 1차 목표 도달: ${name(p)} ${money(price)} — 절반 이익 실현 검토`);
+    if (t1 && price >= t1 && prevPrice < t1 && once(`t1-${p.symbol}`)) lines.push(`🎯 1차 목표 도달: ${name(p)} ${money(price)} — 절반 이익 실현 검토`);
   }
   for (const e of input.newExits) lines.push(`⏏ 추천 종료: ${e.nameKo ?? e.name}(${e.symbol}) ${money(e.exitPrice)} — ${e.reason}`);
   for (const t of input.paperTrades)

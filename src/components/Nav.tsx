@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AlertBell from "./Alerts";
+import { PERF_PATHS } from "./PerfTabs";
 import SymbolSearch from "./SymbolSearch";
 
 const LINKS = [
   { href: "/", label: "홈" },
   { href: "/picks", label: "추천 종목" },
-  { href: "/track", label: "성적표" },
-  { href: "/paper", label: "모의투자" },
+  { href: "/track", label: "성과" },
   { href: "/market", label: "시장 흐름" },
   { href: "/screener", label: "스크리너" },
   { href: "/analyze", label: "종목 분석" },
@@ -20,7 +20,8 @@ const LINKS = [
 
 export default function Nav() {
   const path = usePathname();
-  const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const isActive = (href: string) =>
+    href === "/" ? path === "/" : href === "/track" ? PERF_PATHS.some((p) => path.startsWith(p)) : path.startsWith(href);
   return (
     <header className="border-b border-line bg-bg/90 backdrop-blur sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">

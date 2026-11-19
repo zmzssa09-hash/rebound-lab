@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import Ago from "@/components/Ago";
 import Krw from "@/components/Krw";
+import PerfTabs from "@/components/PerfTabs";
 import Term from "@/components/Term";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { money, pct, signedMoney, toneOf } from "@/lib/format";
@@ -59,6 +60,7 @@ export default function PaperPage() {
   const s = d?.summary;
   return (
     <div className="space-y-5">
+      <PerfTabs />
       <PageHeader
         title="모의투자 — 사이트 규칙대로 따라 했다면"
         desc={

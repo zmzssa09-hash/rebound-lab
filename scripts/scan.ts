@@ -3,10 +3,11 @@
 //   npx tsx scripts/scan.ts          → 장 시간 규칙에 따라 필요할 때만 실행 (예약 실행용)
 //   npx tsx scripts/scan.ts --force  → 무조건 실행 (수동 실행용)
 import { appendFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decideScan, getSession } from "../src/lib/marketClock";
-import { buildDigest, sendPush } from "../src/lib/notify";
+import { decideScan, getSession, nextRegularOpen } from "../src/lib/marketClock";
+import { buildDigest, sendPush, SITE_URL } from "../src/lib/notify";
+import { buildWeekly, isWeekEnd, saveWeekly, weeklyPush } from "../src/lib/weekly";
 import { getResult, lastScanEvents, runScanOnce } from "../src/lib/scanner";
 
 const force = process.argv.includes("--force");
@@ -53,17 +54,34 @@ async function main() {
   setOutput(true);
 
   // 휴대폰 푸시 알림 (GitHub Actions에서만: PUSH_ENABLED=1)
-  const ev = lastScanEvents();
-  const digest = buildDigest({ prevTop, top: r.top, newExits: ev.newExits, paperTrades: ev.paperTrades });
-  if (!digest) console.log("알림: 새 소식 없음");
-  else if (process.env.PUSH_ENABLED !== "1") console.log(`알림(로컬 실행이라 보내지 않음): ${digest.title}\n${digest.message}`);
-  else {
+  const push = async (d: { title: string; message: string }, click?: string) => {
+    if (process.env.PUSH_ENABLED !== "1") return console.log(`알림(로컬 실행이라 보내지 않음): ${d.title}\n${d.message}`);
     try {
-      await sendPush(digest);
-      console.log(`알림 보냄: ${digest.title}`);
+      await sendPush(d, click);
+      console.log(`알림 보냄: ${d.title}`);
     } catch (e) {
       console.error("알림 실패:", (e as Error).message);
     }
+  };
+  const ev = lastScanEvents();
+  // 같은 종목·같은 종류 알림은 24시간에 한 번 (기록은 data 브랜치에 함께 저장)
+  const seenFile = path.join(process.cwd(), ".data", "notify-state.json");
+  const seen: Record<string, number> = await readFile(seenFile, "utf8").then(
+    (t) => JSON.parse(t) as Record<string, number>,
+    () => ({}),
+  );
+  const digest = buildDigest({ prevTop, top: r.top, newExits: ev.newExits, paperTrades: ev.paperTrades, seen });
+  await writeFile(seenFile, JSON.stringify(seen));
+  if (!digest) console.log("알림: 새 소식 없음");
+  else await push(digest);
+
+  // 주간 리포트: 이번 주 마지막 정규장의 마감 확정 분석 때 (테스트: --weekly)
+  const weekEnd = decision.kind === "close" && isWeekEnd(session.regularEnd, nextRegularOpen(session).at);
+  if (weekEnd || process.argv.includes("--weekly")) {
+    const w = await buildWeekly(r.top);
+    await saveWeekly(w);
+    console.log(`주간 리포트 저장: ${w.range} — ${w.headline}`);
+    await push(weeklyPush(w), `${SITE_URL}/weekly`);
   }
 }
 

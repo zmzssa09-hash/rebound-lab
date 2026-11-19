@@ -1,0 +1,50 @@
+# 과거 검증(백테스트): 매달 1일 자동 실행 + Actions 탭에서 수동 실행
+# 결과(backtest.json)는 분석 결과와 같은 'data' 브랜치에 저장된다.
+name: backtest
+
+on:
+  schedule:
+    - cron: "0 3 1 * *" # 매달 1일 03:00 UTC (한국 12:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 분석(market-scan)과 같은 그룹 → 동시에 data 브랜치를 덮어쓰지 않도록 차례로 실행
+concurrency:
+  group: market-scan
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore data
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: .data
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Backtest (거래대금 상위 500종목 · 10년)
+        run: npx tsx scripts/backtest.ts 500
+
+      - name: Publish data branch
+        run: |
+          cd .data
+          rm -rf .git scan.lock
+          git init -q -b data
+          git config user.name "rebound-lab-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "backtest $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
