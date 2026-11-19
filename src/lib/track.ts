@@ -47,7 +47,7 @@ export async function loadTrack(): Promise<TrackFile> {
 }
 
 /** t(ms) 시점의 가격 = 그때까지 시작된 마지막 거래일의 종가 (장 시작 전이면 전날 종가) */
-function closeOnOrAfter(bars: Bar[], t: number): number | null {
+export function closeOnOrAfter(bars: Bar[], t: number): number | null {
   let hit: Bar | null = null;
   for (const b of bars) {
     if (b.time * 1000 <= t) hit = b;
@@ -161,7 +161,7 @@ const med = (xs: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-function stats(pairs: { r: number; s: number | null }[]): PeriodStats {
+export function stats(pairs: { r: number; s: number | null }[]): PeriodStats {
   const n = pairs.length;
   if (!n) return { n: 0, winRate: null, avg: null, median: null, spyAvg: null, beatRate: null };
   const withSpy = pairs.filter((p) => p.s != null);

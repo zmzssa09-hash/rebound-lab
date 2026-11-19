@@ -86,6 +86,9 @@ async function main() {
       site: simulatePortfolio(trades, closeOf, spyBars, { skipBear: false }),
       noBear: simulatePortfolio(trades, closeOf, spyBars, { skipBear: true }),
       ...Object.fromEntries(ALT.map((a) => [a.key, simulatePortfolio(alt[a.key], closeOf, spyBars, { skipBear: false })])),
+      // 남는 현금은 S&P 500 ETF(SPY)에 넣어 두기
+      sitePark: simulatePortfolio(trades, closeOf, spyBars, { skipBear: false, parkSpy: true }),
+      wide60Park: simulatePortfolio(alt.wide60, closeOf, spyBars, { skipBear: false, parkSpy: true }),
     },
     byYear: years.map((y) => ({ year: y, stats: tradeStats(trades.filter((t) => year(t) === y)) })),
     buckets: [
@@ -111,6 +114,7 @@ async function main() {
   await writeFile(path.join(DATA, "backtest.json"), JSON.stringify(result));
   const s = result.variants[0].stats;
   const p = result.portfolio.site;
+  for (const [k, q] of Object.entries(result.portfolio)) console.log(`  ${k}: 연 ${q.cagr?.toFixed(1)}% · 누적 ${q.totalRet.toFixed(0)}% · MDD ${q.mdd.toFixed(1)}% · 투자 비중 ${q.avgInvested.toFixed(0)}% · 매매 ${q.trades}`);
   console.log(
     `완료 ${result.seconds}초 · 거래당 평균 ${s.avg?.toFixed(2)}% (승률 ${((s.winRate ?? 0) * 100).toFixed(0)}%) · 포트폴리오 연 ${p.cagr?.toFixed(1)}% (S&P ${p.spyCagr?.toFixed(1)}%) · MDD ${p.mdd.toFixed(1)}%`,
   );

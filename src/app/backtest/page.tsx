@@ -28,6 +28,7 @@ interface Portfolio {
   spyCagr: number | null;
   spyMdd: number | null;
   trades: number;
+  avgInvested?: number;
   curve: { t: number; equity: number; spy: number }[];
 }
 interface Result {
@@ -49,6 +50,8 @@ const PORT_LABEL: Record<string, string> = {
   wide60: "넓은 손절 + 목표가, 최대 60일",
   wide20: "넓은 손절 + 목표가, 최대 20일",
   none20: "손절 없이 목표가, 최대 20일",
+  sitePark: "사이트 규칙 + 남는 현금은 S&P 500 ETF",
+  wide60Park: "넓은 손절(60일) + 남는 현금은 S&P 500 ETF",
 };
 
 export default function BacktestPage() {
@@ -125,6 +128,7 @@ export default function BacktestPage() {
                     <th className="text-right">연평균 수익</th>
                     <th className="text-right">전체 수익</th>
                     <th className="text-right">최대 하락폭</th>
+                    <th className="text-right">평균 투자 비중</th>
                     <th className="text-right">매매 수</th>
                   </tr>
                 </thead>
@@ -135,6 +139,7 @@ export default function BacktestPage() {
                       <td className={`text-right num font-semibold ${toneOf(p.cagr)}`}>{pct(p.cagr, 1)}</td>
                       <td className={`text-right num ${toneOf(p.totalRet)}`}>{pct(p.totalRet, 0)}</td>
                       <td className="text-right num text-down">{pct(p.mdd, 1)}</td>
+                      <td className="text-right num">{p.avgInvested != null ? `${Math.round(p.avgInvested)}%` : "–"}</td>
                       <td className="text-right num">{p.trades}</td>
                     </tr>
                   ))}
@@ -144,12 +149,17 @@ export default function BacktestPage() {
                       <td className={`text-right num ${toneOf(r.portfolio.site.spyCagr)}`}>{pct(r.portfolio.site.spyCagr, 1)}</td>
                       <td className={`text-right num ${toneOf(r.portfolio.site.spyTotal)}`}>{pct(r.portfolio.site.spyTotal, 0)}</td>
                       <td className="text-right num text-down">{pct(r.portfolio.site.spyMdd, 1)}</td>
+                      <td className="text-right num">100%</td>
                       <td className="text-right num">–</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted mt-2">
+              평균 투자 비중 = 종목에 들어가 있던 돈의 평균 비율. 나머지는 현금입니다. &lsquo;남는 현금은 S&P 500 ETF&rsquo; 규칙은 현금을 자산의 20%(한 종목 몫)만 남기고,
+              30%를 넘으면 넘친 만큼 ETF를 사고, 종목을 살 현금이 모자라면 그만큼만 ETF를 팝니다 (ETF 매매 수수료 포함).
+            </p>
             {r.portfolio.site && <Curve p={r.portfolio.site} />}
           </Section>
 
@@ -226,6 +236,7 @@ function Summary({ r }: { r: Result }) {
   const site = r.variants.find((v) => v.key === "site")?.stats;
   const best = [...r.variants].filter((v) => v.key !== "hold20").sort((a, b) => (b.stats.avg ?? -99) - (a.stats.avg ?? -99))[0];
   const p = r.portfolio.site;
+  const park = r.portfolio.sitePark;
   if (!site || !p) return null;
   const edge = (site.avg ?? 0) - (site.spyAvg ?? 0);
   return (
@@ -239,6 +250,13 @@ function Summary({ r }: { r: Result }) {
         $10,000로 운용했다면 연평균 <b className="num">{pct(p.cagr, 1)}</b>(S&P 500 <span className="num">{pct(p.spyCagr, 1)}</span>)였고, 최대 하락폭은{" "}
         <span className="num">{pct(p.mdd, 1)}</span>로 지수(<span className="num">{pct(p.spyMdd, 1)}</span>)보다 작았습니다 — 한 번에 조금씩만 투자하기 때문에 덜 벌고 덜 잃습니다.
       </p>
+      {park && (
+        <p>
+          남는 현금을 S&P 500 ETF에 넣어 두면 연평균 <b className="num">{pct(park.cagr, 1)}</b>로 늘지만, 최대 하락폭도 <span className="num">{pct(park.mdd, 1)}</span>로
+          지수만큼 커집니다. 그래도 S&P 500을 그냥 사서 들고 있는 것(<span className="num">{pct(p.spyCagr, 1)}</span>)보다는 낮았습니다. 과거 10년만 보면 지수를 그냥 들고 있는 것이 수익이 가장 높았으므로,{" "}
+          <b>초보자라면 돈의 대부분은 지수 ETF에 두고 일부만 이 사이트 추천으로 매매하는 것</b>이 안전합니다.
+        </p>
+      )}
       {best && best.key !== "site" && (
         <p>
           비교한 규칙 중에서는 <b>{best.label}</b>이 거래당 평균 <b className="num">{pct(best.stats.avg, 2)}</b>(승률 {pr(best.stats.winRate)})로 가장 좋았습니다.

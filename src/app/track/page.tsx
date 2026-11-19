@@ -6,6 +6,7 @@ import PerfTabs from "@/components/PerfTabs";
 import Term from "@/components/Term";
 import { Chip, Empty, PageHeader, Section } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
+import type { FilterStats } from "@/lib/filterTrack";
 
 interface Point {
   price: number;
@@ -40,6 +41,7 @@ interface Resp {
   startedAt: number | null;
   stats: { total: number; open: number; closed: number; w1: PStats; w4: PStats; exit: PStats; current: PStats };
   records: Rec[];
+  filter?: FilterStats;
 }
 
 const r = (a: number, b: number) => ((b - a) / a) * 100;
@@ -142,6 +144,7 @@ export default function TrackPage() {
               </table>
             </div>
           </Section>
+          {data.filter && <FilterCheck f={data.filter} />}
           <p className="text-xs text-muted leading-relaxed">
             추천가는 그 종목이 Top 10에 처음 들어온 분석 시점의 가격입니다. 1주·4주 뒤는 추천일로부터 7일·28일이 지난 뒤 첫 거래일 종가, 종료는 Top 10에서 빠진
             분석 시점의 가격입니다. 수수료·세금·환율은 반영하지 않았습니다. 과거 성과가 미래 수익을 보장하지 않습니다.
@@ -201,5 +204,72 @@ function Verdict({ s }: { s: Resp["stats"] }) {
       추천 {base.k} 뒤 평균 수익률은 S&P 500보다 <b className="num">{excess > 0 ? "+" : ""}{excess.toFixed(1)}%p</b> {excess > 0 ? "높습니다" : "낮습니다"} (승률 {pr(base.p.winRate)}, {base.p.n}건).
       {!good && " 모델 점검이 필요합니다."}
     </div>
+  );
+}
+
+/** 필터 검증: 추천한 종목 vs 걸러낸 종목 */
+function FilterCheck({ f }: { f: FilterStats }) {
+  const k = f.passed.w4.n >= 20 && f.cut.w4.n >= 20 ? "w4" : "w1";
+  const a = f.passed[k];
+  const b = f.cut[k];
+  const ready = a.n >= 20 && b.n >= 20;
+  const diff = (a.avg ?? 0) - (b.avg ?? 0);
+  return (
+    <Section title="필터 검증 — 추천한 종목 vs 걸러낸 종목">
+      <p className="text-sm text-muted leading-relaxed mb-3">
+        이 사이트는 과매도 종목 중 <b>회피 신호</b>(적자 확대·현금 소진 등)가 있거나 <b>장기 보유 기준</b>에 못 미치는 종목을 걸러냅니다. 이 필터가 정말 손실을
+        막아 주는지, 걸러낸 종목도 똑같이 기록해 비교합니다. 과매도(RSI 30 이하)로 분석한 종목을 28일에 한 번씩 기록합니다.
+      </p>
+      <div
+        className={`rounded-lg border px-3 py-2.5 text-sm mb-3 ${!ready ? "border-line bg-panel-2 text-muted" : diff > 0 ? "border-good/40 bg-good/5" : "border-warn/40 bg-warn/5"}`}
+      >
+        {!ready ? (
+          <>아직 기록이 적어 판단하기 이릅니다. 양쪽 모두 1주 결과가 20건 이상 쌓이면 여기서 평가합니다.</>
+        ) : diff > 0 ? (
+          <>
+            필터를 통과한 종목이 걸러낸 종목보다 {k === "w4" ? "4주" : "1주"} 뒤 평균 <b className="num">{diff.toFixed(1)}%p</b> 더 좋았습니다 — 필터가 제 몫을 하고 있습니다.
+          </>
+        ) : (
+          <>
+            걸러낸 종목이 오히려 평균 <b className="num">{(-diff).toFixed(1)}%p</b> 더 좋았습니다 — 필터가 좋은 종목까지 버리고 있을 수 있어 기준 점검이 필요합니다.
+          </>
+        )}
+      </div>
+      <div className="overflow-x-auto -mx-4 sm:-mx-5">
+        <table className="data min-w-[720px]">
+          <thead>
+            <tr>
+              <th>그룹</th>
+              <th className="text-right">기록</th>
+              <th className="text-right">1주 뒤 평균</th>
+              <th className="text-right">4주 뒤 평균</th>
+              <th className="text-right">4주 <Term k="승률" /></th>
+              <th className="text-right">같은 기간 지수 (4주)</th>
+              <th className="text-right">지금까지 (4주 전)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {f.groups.map((g) => (
+              <tr key={g.key} className={g.key === "top" ? "bg-accent/5" : ""}>
+                <td>
+                  <div className="font-medium">{g.label}</div>
+                  <div className="text-[11px] text-muted">{g.desc}</div>
+                </td>
+                <td className="text-right num">{g.n}</td>
+                <td className={`text-right num ${toneOf(g.w1.avg)}`}>{g.w1.n ? <>{pct(g.w1.avg, 1)} <span className="text-[10px] text-muted">({g.w1.n})</span></> : "대기"}</td>
+                <td className={`text-right num ${toneOf(g.w4.avg)}`}>{g.w4.n ? <>{pct(g.w4.avg, 1)} <span className="text-[10px] text-muted">({g.w4.n})</span></> : "대기"}</td>
+                <td className="text-right num">{g.w4.n ? pr(g.w4.winRate) : "–"}</td>
+                <td className={`text-right num text-muted`}>{g.w4.n ? pct(g.w4.spyAvg, 1) : "–"}</td>
+                <td className={`text-right num ${toneOf(g.current.avg)}`}>{g.current.n ? pct(g.current.avg, 1) : "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted mt-2">
+        {f.startedAt ? `${new Date(f.startedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}부터 기록 · ` : ""}
+        총 {f.total}건. 가격은 기록한 분석 시점 기준이며 수수료는 반영하지 않았습니다. &lsquo;지금까지&rsquo;는 4주가 안 된 기록의 현재까지 수익률입니다.
+      </p>
+    </Section>
   );
 }

@@ -211,14 +211,19 @@ export interface BtPortfolio {
   spyCagr: number | null;
   spyMdd: number | null;
   trades: number;
+  avgInvested: number; // 평균 투자 비중 % (종목에 들어간 돈)
   curve: { t: number; equity: number; spy: number }[]; // 주 단위
 }
+
+/** 남는 현금 → SPY 규칙: 현금은 자산의 20%만 남기고, 30%를 넘으면 넘친 만큼 SPY 매수 */
+export const PARK_CASH = 0.2;
+export const PARK_BAND = 0.1;
 
 export function simulatePortfolio(
   trades: BtTrade[],
   closeOf: (symbol: string, t: number) => number | null,
   spyBars: Bar[],
-  opts: { skipBear: boolean; startCash?: number; maxPos?: number },
+  opts: { skipBear: boolean; startCash?: number; maxPos?: number; parkSpy?: boolean; parkFee?: number },
 ): BtPortfolio {
   const startCash = opts.startCash ?? 10_000;
   const maxPos = opts.maxPos ?? 5;
@@ -246,12 +251,21 @@ export function simulatePortfolio(
   const spy0 = days[0]?.close ?? 1;
   let spyPeak = spy0;
   let spyMdd = 0;
+  let invSum = 0;
+  // parkSpy: 쓰지 않는 현금은 S&P 500 ETF(SPY)에 넣어 둔다 (현실적인 규칙)
+  //  · 현금은 자산의 PARK_CASH(20% = 한 종목 몫)만 남기고, 그보다 PARK_BAND(10%) 넘게 많아지면 넘친 만큼 SPY를 산다
+  //  · 종목을 사려는데 현금이 모자라면 그만큼만 SPY를 판다 (SPY 매매에도 수수료)
+  const park = opts.parkSpy === true;
+  const pFee = opts.parkFee ?? BT_FEE;
+  let spyVal = 0;
   for (let k = 0; k < days.length; k++) {
     const d = days[k];
     const dk = day(d.time);
+    if (park && k > 0) spyVal *= d.close / days[k - 1].close;
     // 평가
     const mark = () =>
       cash +
+      spyVal +
       open.reduce((a, o) => {
         const left = o.legs.reduce((s, l) => s + l.frac, 0);
         const px = closeOf(o.t.symbol, d.time) ?? o.last;
@@ -266,9 +280,16 @@ export function simulatePortfolio(
       const eq = mark();
       const byRisk = (eq * 0.01) / (t.entry - t.stop);
       const byCap = (eq * 0.2) / t.entry;
-      const shares = Math.min(byRisk, byCap, cash / (t.entry * (1 + BT_FEE)));
+      const avail = cash + spyVal * (1 - pFee);
+      const shares = Math.min(byRisk, byCap, avail / (t.entry * (1 + BT_FEE)));
       if (shares * t.entry < 50) continue;
-      cash -= shares * t.entry * (1 + BT_FEE);
+      const cost = shares * t.entry * (1 + BT_FEE);
+      if (cost > cash) {
+        const sell = Math.min(spyVal, (cost - cash) / (1 - pFee));
+        spyVal -= sell;
+        cash += sell * (1 - pFee);
+      }
+      cash = Math.max(0, cash - cost);
       open.push({ t, shares, legs: [...t.legs], last: t.entry });
       count++;
     }
@@ -278,7 +299,16 @@ export function simulatePortfolio(
       o.legs = o.legs.filter((x) => day(x.t) > dk);
     }
     for (let x = open.length - 1; x >= 0; x--) if (!open[x].legs.length) open.splice(x, 1);
+    if (park) {
+      const e0 = mark();
+      if (cash > e0 * (PARK_CASH + PARK_BAND)) {
+        const buy = cash - e0 * PARK_CASH;
+        cash -= buy;
+        spyVal += buy * (1 - pFee);
+      }
+    }
     const eq = mark();
+    invSum += eq > 0 ? (eq - cash - spyVal) / eq : 0;
     peak = Math.max(peak, eq);
     mdd = Math.min(mdd, eq / peak - 1);
     spyPeak = Math.max(spyPeak, d.close);
@@ -298,6 +328,7 @@ export function simulatePortfolio(
     spyCagr: spyEnd != null && years > 0.5 ? (spyEnd ** (1 / years) - 1) * 100 : null,
     spyMdd: spyMdd * 100,
     trades: count,
+    avgInvested: days.length ? (invSum / days.length) * 100 : 0,
     curve,
   };
 }

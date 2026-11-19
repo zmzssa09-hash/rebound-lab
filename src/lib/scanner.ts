@@ -11,6 +11,7 @@ import { koreanName } from "./naver";
 import { activeSymbols, loadHistory, selectTop } from "./ranking";
 import { seedTrackFromHistory, updateTrack } from "./track";
 import { updatePaper, type PaperTrade } from "./paper";
+import { updateFilterTrack } from "./filterTrack";
 import { LONG_TERM_MIN, RED_FLAGS } from "./scorecard";
 import type { Bar, Pick, PickExit, Tone, Trend } from "./types";
 import { fetchChart } from "./yahoo";
@@ -458,6 +459,13 @@ async function runScan() {
     await updateTrack(top, exits);
   } catch (e) {
     console.error("성적표 갱신 실패:", (e as Error).message);
+  }
+  // 필터 검증 성적표 (추천 vs 걸러낸 종목)
+  try {
+    const priceBy = new Map(rows.map((x) => [x.symbol, x.price]));
+    await updateFilterTrack(picks, top, (sym) => priceBy.get(sym) ?? null);
+  } catch (e) {
+    console.error("필터 검증 기록 실패:", (e as Error).message);
   }
   // 가상 포트폴리오 자동 매매
   try {
