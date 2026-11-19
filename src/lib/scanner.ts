@@ -331,6 +331,13 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
   };
 }
 
+/** 종목 하나를 추천 후보와 같은 방식으로 평가 (AI 상담용 — 추천 후보가 아닌 종목도) */
+export async function pickForSymbol(symbol: string): Promise<Pick | null> {
+  const r = await getResult();
+  const row = r?.rows.find((x) => x.symbol === symbol);
+  return buildPick(row ?? ({ symbol, name: symbol, changePct: null, rsi: null } as unknown as ScanRow));
+}
+
 // ───────── 스캔 ─────────
 
 /** 전체 분석 1회 실행 (GitHub Actions 스크립트에서 직접 호출) */

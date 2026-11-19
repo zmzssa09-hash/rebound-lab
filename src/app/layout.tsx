@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import ChatWidget from "@/components/ChatWidget";
 import MarketStatusBanner from "@/components/MarketStatusBanner";
 import Nav from "@/components/Nav";
 import "./globals.css";
@@ -29,6 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             브라우저에만 저장됩니다.
           </div>
         </footer>
+        <Suspense fallback={null}>
+          <ChatWidget />
+        </Suspense>
       </body>
     </html>
   );
