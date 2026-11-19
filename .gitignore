@@ -42,3 +42,6 @@ next-env.d.ts
 
 # scanner cache
 /.data
+
+.vercel
+.env*
