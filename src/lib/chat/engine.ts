@@ -339,6 +339,13 @@ export async function answer(history: LlmMessage[]): Promise<ChatReply> {
   try {
     const r = await complete({ system: PLAN_SYSTEM, messages: history.slice(-6), json: true, maxTokens: 250, temperature: 0 });
     plan = normalizePlan(parseJson<Partial<ChatPlan>>(r.text));
+    // AI가 빠뜨리기 쉬운 조건은 규칙으로 보완 ("살 만한" → 매수 구간만, "걸러낸" → 제외 종목만)
+    const rule = ruleBasedPlan(q);
+    if (!plan.stocks.length) {
+      plan.buyZoneOnly ||= rule.buyZoneOnly;
+      plan.excludedOnly ||= rule.excludedOnly;
+      if (plan.excludedOnly) plan.buyZoneOnly = false;
+    }
     ai = r.provider;
   } catch (e) {
     if (!(e instanceof LlmUnavailable)) console.error("AI 검색 조건 실패:", (e as Error).message);
