@@ -13,7 +13,8 @@ import PositionSizer, { SizingSettings } from "@/components/PositionSizer";
 import Term from "@/components/Term";
 import Krw from "@/components/Krw";
 import { sectorCounts, useSectors } from "@/lib/useSectors";
-import { setData, uid, useAppData } from "@/lib/store";
+import { setData, uid, useAppData, useSimpleMode } from "@/lib/store";
+import { pickVerdict } from "@/lib/simple";
 import type { Pick, PickExit } from "@/lib/types";
 
 interface PicksResponse {
@@ -54,6 +55,7 @@ export default function PicksPage() {
   const [data, setResp] = useState<PicksResponse | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const app = useAppData();
+  const [simple, setSimplePref] = useSimpleMode();
   const watched = new Set(app.watchlist.map((w) => w.symbol));
 
   const load = useCallback(async () => {
@@ -99,6 +101,27 @@ export default function PicksPage() {
           </>
         }
       />
+
+      {/* 보기 방식 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border border-line p-0.5 text-sm">
+          {[
+            { on: true, label: "쉽게 보기" },
+            { on: false, label: "자세히 보기" },
+          ].map((o) => (
+            <button
+              key={o.label}
+              onClick={() => setSimplePref(o.on)}
+              className={`rounded-md px-3 py-1 ${simple === o.on ? "bg-accent text-bg font-semibold" : "text-muted hover:text-text"}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-muted">
+          {simple ? "사도 되는지와 가격 3개(살 가격·손절가·목표가)만 보여 줍니다." : "점수·등급·RSI·매수 구간 등 모든 분석을 보여 줍니다."}
+        </span>
+      </div>
 
       {/* 상태 줄 */}
       <div className="card px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
@@ -153,7 +176,10 @@ export default function PicksPage() {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {top.map((p) => (
+          {top.map((p) =>
+            simple ? (
+              <SimpleCard key={p.symbol} p={p} />
+            ) : (
             <PickCard
               key={p.symbol}
               p={p}
@@ -161,7 +187,8 @@ export default function PicksPage() {
               onWatch={() => addWatch(p.symbol)}
               sameSectorHeld={(p.sectorKo && heldBySector.get(p.sectorKo)?.filter((x) => x !== p.symbol)) || []}
             />
-          ))}
+            ),
+          )}
         </div>
       )}
 
@@ -421,6 +448,75 @@ function PlanBox({ p, price }: { p: Pick; price: number }) {
           <ZoneLadder z={plan.zones} price={price} current={zone} stop={plan.stop?.price ?? null} compact />
         </details>
       )}
+    </div>
+  );
+}
+
+/** 쉽게 보기: 판정 + 가격 3개 + 한 줄 하락 이유 */
+function SimpleCard({ p }: { p: Pick }) {
+  const v = pickVerdict(p);
+  const chg = p.live?.changePct ?? p.changePct;
+  const rel = (x: number | null) => (x == null ? null : ((x - v.price) / v.price) * 100);
+  const reason = p.dropBullets.slice(1).find((b) => !/^최근 3개월 고점/.test(b)) ?? p.dropBullets[0];
+  const buyText =
+    v.key === "buy" ? "지금 가격" : v.act.title === "실적 발표 대기" ? "발표 뒤 다시 확인" : v.buyAt != null && v.buyAt < v.price ? "이 가격 이하로 오면" : "–";
+  return (
+    <div className="card p-4 sm:p-5 flex flex-col">
+      <div className="flex items-start gap-3">
+        <span className="text-xl font-semibold num leading-none w-6 shrink-0 text-center">{p.rank}</span>
+        <div className="min-w-0 flex-1">
+          <Link href={`/analyze/${p.symbol}`} className="text-lg font-semibold hover:text-accent">{p.nameKo ?? p.name}</Link>
+          <div className="text-xs text-muted truncate">{p.symbol} · {p.sectorKo ?? "–"}</div>
+        </div>
+        <div className="text-right shrink-0 num">
+          <div className="font-semibold">{money(v.price)}</div>
+          <div className="text-xs">
+            <span className={toneOf(chg)}>{pct(chg, 1)}</span>
+            <Krw usd={v.price} className="text-muted" />
+          </div>
+        </div>
+      </div>
+
+      <div className={`mt-3 rounded-lg border px-3 py-2.5 ${TONE_CLASS[v.info.tone]}`}>
+        <div className="flex items-center gap-2">
+          <span className="text-lg leading-none">{v.info.dot}</span>
+          <span className="text-lg font-bold text-text">{v.info.label}</span>
+          <span className="text-xs opacity-80">({v.act.title})</span>
+          {v.earningsDays != null && v.earningsDays <= 14 && <span className="ml-auto"><EarningsChip days={v.earningsDays} /></span>}
+        </div>
+        <p className="text-xs text-text/85 mt-1 leading-snug">{v.act.text}</p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+        {[
+          { k: "살 가격", price: v.key === "buy" ? v.price : v.buyAt != null && v.buyAt < v.price ? v.buyAt : null, sub: buyText, cls: "text-good" },
+          { k: "손절가", price: v.stop, sub: "여기까지 떨어지면 판다", cls: "text-down" },
+          { k: "1차 목표", price: v.t1, sub: "여기서 절반 판다", cls: "text-up" },
+        ].map((x) => (
+          <div key={x.k} className="rounded-lg border border-line px-2 py-2">
+            <div className="text-[11px] text-muted">{x.k}</div>
+            <div className={`font-semibold num mt-0.5 ${x.price != null ? x.cls : "text-muted"}`}>{x.price != null ? money(x.price) : "–"}</div>
+            <div className="text-[10px] text-muted num leading-tight mt-0.5">
+              {x.price != null && x.k !== "살 가격" && <>{pct(rel(x.price), 0)} · </>}
+              {x.sub}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {v.key === "buy" && v.stop != null && (
+        <div className="mt-2">
+          <PositionSizer price={v.price} stop={v.stop} compact />
+        </div>
+      )}
+
+      <div className="mt-3 text-xs leading-relaxed flex-1">
+        <span className="font-medium">왜 떨어졌나</span>{" "}
+        <span className={`rounded-full border px-2 py-px text-[11px] ${TONE_CLASS[p.dropTone]}`}>{p.dropNatureLabel}</span>
+        {reason && <p className="text-text/80 mt-1">{reason}</p>}
+      </div>
+
+      <Link href={`/analyze/${p.symbol}`} className="text-sm text-accent mt-3">자세한 분석 보기 →</Link>
     </div>
   );
 }

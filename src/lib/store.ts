@@ -47,7 +47,14 @@ export function normalize(x: unknown): AppData {
             gainsKrw: Number(d.sizing.gainsKrw) || 0,
           }
         : undefined,
+    simple: typeof d.simple === "boolean" ? d.simple : undefined,
   };
+}
+
+/** 초보 모드 (처음 방문자는 켜짐) */
+export function useSimpleMode(): [boolean, (on: boolean) => void] {
+  const d = useAppData();
+  return [d.simple ?? true, (on) => setData((x) => ({ ...x, simple: on }))];
 }
 
 export function setData(updater: (d: AppData) => AppData) {

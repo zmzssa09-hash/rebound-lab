@@ -8,6 +8,7 @@ import { TREND_LABEL, zoneStatus } from "@/lib/analysis";
 import { daysUntil, money, pct, signedMoney, toneOf } from "@/lib/format";
 import Spark from "@/components/Spark";
 import WelcomeBanner from "@/components/WelcomeBanner";
+import TodayPanel from "@/components/TodayPanel";
 import { useMarket } from "@/lib/useMarket";
 import { useAppData, useHydrated } from "@/lib/store";
 import { CONCENTRATION_LIMIT, CORE_IDEA } from "@/lib/strategy";
@@ -231,6 +232,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <WelcomeBanner />
+      <TodayPanel positions={app.positions} priceOf={(s) => q(s)?.price ?? null} />
       {isEmpty && (
         <div className="card p-6 sm:p-8">
           <h1 className="text-2xl font-semibold tracking-tight">떨어진 이유까지 확인하는 과매도 미국 주식 추천</h1>

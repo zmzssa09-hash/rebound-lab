@@ -155,6 +155,8 @@ export interface AppData {
   pretrade: Record<string, boolean>;
   /** 몇 주 살지 계산기 설정 (달러) */
   sizing?: { account: number; riskPct: number; maxWeight: number; unit?: "USD" | "KRW"; gainsKrw?: number };
+  /** 초보 모드 (없으면 켜짐): 추천 카드에 판정과 가격 3개만 */
+  simple?: boolean;
 }
 
 // ===== 추천 종목 =====
