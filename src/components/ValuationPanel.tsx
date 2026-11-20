@@ -2,6 +2,7 @@
 import Term from "@/components/Term";
 import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import { money, pct, toneOf } from "@/lib/format";
+import { bigMoneyKo, sharesKo } from "@/lib/ko";
 import type { HorizonGrade } from "@/lib/grades";
 import type { Resilience } from "@/lib/resilience";
 import { MODEL_NAME, type Sensitivity, type Valuation } from "@/lib/valuation";
@@ -37,8 +38,7 @@ export function GradeBoxes({ grades, loading }: { grades: { short: HorizonGrade;
 }
 
 const CONF_TONE = { high: "good", mid: "warn", low: "bad" } as const;
-const usdBig = (v: number | null) =>
-  v == null ? "–" : Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(0)}M` : `$${v.toFixed(0)}`;
+const usdBig = bigMoneyKo;
 
 /** 적정가 계산 근거 */
 export function ValuationPanel({ v, price, sensitivity }: { v: Valuation | null; price: number; sensitivity?: Sensitivity | null }) {
@@ -99,11 +99,11 @@ export function ValuationPanel({ v, price, sensitivity }: { v: Valuation | null;
         </div>
         <div className="rounded-lg border border-line p-2">
           <div className="text-muted">발행주식</div>
-          <div className="num font-medium mt-0.5">{v.shares.basic ? `${(v.shares.basic / 1e6).toFixed(1)}M` : "확인 불가"}</div>
+          <div className="num font-medium mt-0.5">{v.shares.basic ? sharesKo(v.shares.basic) : "확인 불가"}</div>
         </div>
         <div className="rounded-lg border border-line p-2">
           <div className="text-muted">완전희석주식</div>
-          <div className="num font-medium mt-0.5">{v.shares.used ? `${(v.shares.used / 1e6).toFixed(1)}M` : "확인 불가"}</div>
+          <div className="num font-medium mt-0.5">{v.shares.used ? sharesKo(v.shares.used) : "확인 불가"}</div>
         </div>
         <div className="rounded-lg border border-line p-2">
           <div className="text-muted">1년간 주식 수 변화 (<Term k="희석" />)</div>

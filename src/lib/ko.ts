@@ -28,13 +28,49 @@ export function typeKo(type: string): string {
   return type;
 }
 
-/** 큰 금액을 한국식 단위로: 7,790만 달러 / 12.3억 달러 */
+const fmt = (n: number) => n.toLocaleString("ko-KR");
+
+/** 큰 숫자를 한국식 두 단위로: 3조 4,000억 / 2억 4,500만 / 7,790만 / 5,400 */
+export function koUnits(n: number): string {
+  const sign = n < 0 ? "-" : "";
+  const a = Math.abs(n);
+  if (a >= 1e12) {
+    let jo = Math.floor(a / 1e12);
+    let eok = Math.round((a - jo * 1e12) / 1e10) * 100; // 100억 단위
+    if (eok >= 10000) [jo, eok] = [jo + 1, 0];
+    return `${sign}${fmt(jo)}조${eok ? ` ${fmt(eok)}억` : ""}`;
+  }
+  if (a >= 1e8) {
+    let eok = Math.floor(a / 1e8);
+    let man = Math.round((a - eok * 1e8) / 1e6) * 100; // 100만 단위
+    if (man >= 10000) [eok, man] = [eok + 1, 0];
+    if (eok >= 10000) return koUnits(n < 0 ? -eok * 1e8 : eok * 1e8);
+    return `${sign}${fmt(eok)}억${man ? ` ${fmt(man)}만` : ""}`;
+  }
+  if (a >= 1e4) return `${sign}${fmt(Math.round(a / 1e4))}만`;
+  return `${sign}${fmt(Math.round(a))}`;
+}
+
+/** 큰 금액을 한국식 단위로: 3조 4,000억 달러 / 2억 4,500만 달러 / 7,790만 달러 */
 export function bigMoneyKo(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "–";
-  if (n >= 1e12) return `${(n / 1e12).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}조 달러`;
-  if (n >= 1e8) return `${(n / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억 달러`;
-  if (n >= 1e4) return `${Math.round(n / 1e4).toLocaleString("ko-KR")}만 달러`;
-  return `${Math.round(n).toLocaleString("ko-KR")}달러`;
+  return Math.abs(n) >= 1e4 ? `${koUnits(n)} 달러` : `${koUnits(n)}달러`;
+}
+
+/** 주식 수: 24억 5,600만 주 */
+export function sharesKo(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "–";
+  return `${koUnits(n)} 주`;
+}
+
+/** 좁은 칸용 짧은 표기: 3.4조 / 12.3억 / 7,790만 */
+export function shortKo(n: number): string {
+  const a = Math.abs(n);
+  const s = n < 0 ? "-" : "";
+  if (a >= 1e12) return `${s}${(a / 1e12).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}조`;
+  if (a >= 1e8) return `${s}${(a / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: a >= 1e10 ? 0 : 1 })}억`;
+  if (a >= 1e4) return `${s}${fmt(Math.round(a / 1e4))}만`;
+  return `${s}${fmt(Math.round(a))}`;
 }
 
 /** 시장 지표 표시 이름 */

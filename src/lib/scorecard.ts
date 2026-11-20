@@ -3,6 +3,7 @@
 //   시장 환경 및 수급 10 · 수익 잠재력 15(단기 9 + 장기 6) · 가격 회복력 15
 // 실제 점수는 재무·시세 자료를 확인한 뒤 자동 산정하며, 직접 수정할 수 있다.
 import type { DropAnalysis } from "./dropReason";
+import { bigMoneyKo } from "./ko";
 import type { Resilience } from "./resilience";
 import type { Fundamentals, Snapshot, Tone } from "./types";
 import { earningsOutlook, isFinancialCo, MODEL_NAME, type Valuation } from "./valuation";
@@ -216,11 +217,7 @@ export interface AutoScore {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const pc = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
-const usd = (v: number) => {
-  const a = Math.abs(v);
-  const s = a >= 1e9 ? `$${(a / 1e9).toFixed(2)}B` : a >= 1e6 ? `$${(a / 1e6).toFixed(0)}M` : `$${a.toFixed(0)}`;
-  return v < 0 ? `-${s}` : s;
-};
+const usd = (v: number) => (Math.abs(v) >= 1e6 ? bigMoneyKo(v) : `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(0)}`);
 
 export function autoScore(
   f: Fundamentals | null,

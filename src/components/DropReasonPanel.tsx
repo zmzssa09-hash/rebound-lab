@@ -1,7 +1,7 @@
 "use client";
 import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import type { DropAnalysis, TagKind } from "@/lib/dropReason";
-import { bigMoneyKo } from "@/lib/ko";
+import { bigMoneyKo, shortKo } from "@/lib/ko";
 import type { Fundamentals, Tone } from "@/lib/types";
 
 export const KIND_TONE: Record<TagKind, Tone> = {
@@ -139,7 +139,7 @@ export default function DropReasonPanel({
                   const down = i > 0 && q.revenue < arr[i - 1].revenue;
                   return (
                     <div key={q.date} className="flex-1 flex flex-col items-center gap-1" title={`${q.date}: ${bigMoneyKo(q.revenue)}`}>
-                      <span className="text-[10px] num text-muted">{(q.revenue / 1e6).toFixed(0)}M</span>
+                      <span className="text-[10px] num text-muted">{shortKo(q.revenue)}</span>
                       <div className={`w-full rounded-sm ${down ? "bg-down/70" : "bg-up/60"}`} style={{ height: `${h}px` }} />
                       <span className="text-[10px] text-muted num">{q.date.slice(2, 7)}</span>
                     </div>

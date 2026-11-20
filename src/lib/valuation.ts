@@ -7,6 +7,7 @@
 // 모든 주당가치는 완전희석주식수(스톡옵션·전환사채 등 포함)로 나눈다.
 // 계산할 수 없는 항목(예: FCF 적자 기업의 DCF)은 빼고 나머지 비중으로 다시 나눈다.
 // 같은 계산을 보수적·기준·낙관적 가정으로 세 번 돌려 시나리오별 적정가를 만든다.
+import { bigMoneyKo, sharesKo } from "./ko";
 import type { Fundamentals } from "./types";
 
 export const MODEL_NAME = "이중 투자전략 적정가 모델 1.1";
@@ -59,11 +60,7 @@ const SPIKE_GROWTH = 1.0;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
-const usd = (v: number) => {
-  const a = Math.abs(v);
-  const s = a >= 1e9 ? `$${(a / 1e9).toFixed(2)}B` : a >= 1e6 ? `$${(a / 1e6).toFixed(0)}M` : `$${a.toFixed(2)}`;
-  return v < 0 ? `-${s}` : s;
-};
+const usd = (v: number) => (Math.abs(v) >= 1e6 ? bigMoneyKo(v) : `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(2)}`);
 const d2 = (v: number) => `$${v.toFixed(2)}`;
 const median = (xs: number[]) => {
   if (!xs.length) return null;
@@ -220,7 +217,7 @@ function dcf(f: Fundamentals, shares: number | null, a: Assumptions): ValuationP
     return part;
   }
   part.value = equity / shares;
-  part.detail.push(`÷ 완전희석주식수 ${(shares / 1e6).toFixed(1)}M주 = ${d2(part.value)}`);
+  part.detail.push(`÷ 완전희석주식수 ${sharesKo(shares)} = ${d2(part.value)}`);
   return part;
 }
 
@@ -339,7 +336,7 @@ function growthValue(f: Fundamentals, shares: number | null, a: Assumptions): Va
     ...(sg.note ? [sg.note] : []),
     `반영 성장률 ${pct(rg)}(최대 30%), 총이익률 ${pct(gm)}(경쟁력·가격결정력), 영업이익률 ${pct(om)}`,
     `적정 EV/매출 = 0.8 + 12×성장률 + 3×총이익률 + 5×영업이익률 = ${fair.toFixed(2)}배`,
-    `× 매출 ${usd(f.revenue)} + 순현금 ${usd(netCash(f))} ÷ ${(shares / 1e6).toFixed(1)}M주 → ${d2(part.value)}`,
+    `× 매출 ${usd(f.revenue)} + 순현금 ${usd(netCash(f))} ÷ ${sharesKo(shares)} → ${d2(part.value)}`,
   );
   return part;
 }
@@ -585,7 +582,7 @@ export function fairValueModel(f: Fundamentals | null, peers: Fundamentals[], pr
   const shares = base.shares;
   if (f.sharesOutstanding && shares && shares > f.sharesOutstanding * 1.02) {
     notes.push(
-      `스톡옵션·전환사채 등을 포함한 완전희석주식수 ${(shares / 1e6).toFixed(1)}M주(발행주식보다 ${pct(shares / f.sharesOutstanding - 1)} 많음)로 계산했습니다.`,
+      `스톡옵션·전환사채 등을 포함한 완전희석주식수 ${sharesKo(shares)}(발행주식보다 ${pct(shares / f.sharesOutstanding - 1)} 많음)로 계산했습니다.`,
     );
   }
   notes.push("가정에 민감한 참고 시나리오입니다. 보장된 적정가가 아닙니다.");
