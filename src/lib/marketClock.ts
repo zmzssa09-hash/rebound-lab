@@ -62,7 +62,9 @@ export function nextScanTime(session: Session, lastScanAt: number, now = Date.no
 
 /** 장중인데 갱신이 너무 오래 없으면 경고 */
 export function isStale(session: Session, lastScanAt: number, now = Date.now()): boolean {
-  return session.state === "regular" && now - lastScanAt > 75 * 60 * 1000;
+  if (!lastScanAt) return false; // 첫 분석 전
+  // 장중 75분 넘게 갱신 없음, 또는 (긴 연휴를 넘겨) 4일 넘게 갱신 없음
+  return (session.state === "regular" && now - lastScanAt > 75 * 60 * 1000) || now - lastScanAt > 4 * 86400_000;
 }
 
 /** 뉴욕 현지 시각(연·월·일·시·분)을 UTC ms로 변환 (서머타임 자동 반영) */

@@ -51,8 +51,19 @@ export default function MarketStatusBanner() {
   // 직전 정규장이 끝난 지 하루가 넘었으면 주말·휴장
   const holiday = closed && info.regularEnd != null && now - info.regularEnd > 20 * 3600_000 && (!open || open - now > 3600_000);
 
+  const agoH = info.scannedAt ? (now - info.scannedAt) / 3600_000 : 0;
+  const ago = agoH >= 48 ? `${Math.floor(agoH / 24)}일` : agoH >= 1 ? `${Math.floor(agoH)}시간` : `${Math.round(agoH * 60)}분`;
+
   return (
     <>
+      {info.stale && (
+        <div className="border-b border-bad/50 bg-bad/15 text-sm">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-semibold text-bad">⚠ 분석 데이터가 {ago} 전 것입니다</span>
+            <span className="text-text">자동 분석이 멈췄을 수 있습니다. 추천·판정이 지금 시장과 다를 수 있으니, 사고팔기 전에 현재 가격과 손절가를 꼭 다시 확인하세요.</span>
+          </div>
+        </div>
+      )}
       {bear && (
         <div className="border-b border-bad/40 bg-bad/10 text-sm">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">

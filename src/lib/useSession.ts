@@ -18,6 +18,8 @@ export interface SessionInfo {
   nextOpenExact: boolean;
   regime: Regime | null;
   usdkrw: number | null; // 달러-원 환율
+  scannedAt?: number | null; // 마지막 전체 분석 시각
+  stale?: boolean; // 분석이 멈췄을 수 있음
   serverTime: number;
 }
 

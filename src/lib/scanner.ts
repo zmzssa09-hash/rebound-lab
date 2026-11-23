@@ -312,6 +312,8 @@ async function buildPick(row: ScanRow): Promise<Pick | null> {
     confidence: ins.valuation.fairValue != null ? { level: ins.valuation.confidence.level, label: ins.valuation.confidence.label } : null,
     blocked: ins.blocked,
     earningsDate: f?.earningsDate ?? null,
+    shortPct: f?.shortPercentFloat ?? null,
+    shortDays: f?.shortRatio ?? null,
     plan: {
       t1: ins.plan.t1 && { price: ins.plan.t1.price, pct: ins.plan.t1.pct, basis: ins.plan.t1.basis, hitRate: ins.plan.t1.hitRate, medianDays: ins.plan.t1.medianDays },
       t2: ins.plan.t2 && { price: ins.plan.t2.price, pct: ins.plan.t2.pct, basis: ins.plan.t2.basis, hitRate: ins.plan.t2.hitRate },

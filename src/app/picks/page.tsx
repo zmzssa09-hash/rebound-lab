@@ -15,6 +15,7 @@ import Krw from "@/components/Krw";
 import { sectorCounts, useSectors } from "@/lib/useSectors";
 import { setData, uid, useAppData, useSimpleMode } from "@/lib/store";
 import { pickVerdict } from "@/lib/simple";
+import { shortRisk } from "@/lib/shortInterest";
 import type { Pick, PickExit } from "@/lib/types";
 
 interface PicksResponse {
@@ -164,7 +165,7 @@ export default function PicksPage() {
       {st?.state === "error" && <div className="card p-4 text-sm text-bad">분석 실패: {st.error} — 다음 주기에 다시 시도합니다.</div>}
       {data?.stale && !running && (
         <div className="rounded-xl border border-warn/40 bg-warn/5 px-4 py-3 text-sm text-warn">
-          장중인데 전체 분석이 75분 넘게 갱신되지 않았습니다. 자동 분석이 지연되고 있습니다 — 가격은 계속 실시간으로 갱신됩니다.
+          전체 분석이 제때 갱신되지 않았습니다. 자동 분석이 지연되고 있을 수 있습니다 — 가격은 실시간이지만, 추천 순위와 매수 구간은 마지막 분석 기준입니다.
         </div>
       )}
 
@@ -424,6 +425,7 @@ function PlanBox({ p, price }: { p: Pick; price: number }) {
         {ed != null && ed <= 14 && <span className="ml-auto"><EarningsChip days={ed} /></span>}
       </div>
       <p className="text-xs text-text/85 mt-0.5 leading-snug">{act.text}</p>
+      <ShortNote p={p} compact />
       <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] num">
         <div>
           <div className="opacity-75"><Term k="목표가">1차 목표</Term></div>
@@ -453,6 +455,17 @@ function PlanBox({ p, price }: { p: Pick; price: number }) {
 }
 
 /** 쉽게 보기: 판정 + 가격 3개 + 한 줄 하락 이유 */
+/** 공매도 많은 종목 경고 */
+function ShortNote({ p, compact = false }: { p: Pick; compact?: boolean }) {
+  const r = shortRisk(p.shortPct, p.shortDays);
+  if (!r) return null;
+  return (
+    <div className={`${compact ? "mt-1.5" : "mt-2"} text-xs leading-snug ${r.tone === "bad" ? "text-bad" : "text-warn"}`}>
+      ⚡ <b>{r.label}</b>{compact ? " — 변동이 클 수 있음" : <> — {r.text}</>}
+    </div>
+  );
+}
+
 function SimpleCard({ p }: { p: Pick }) {
   const v = pickVerdict(p);
   const chg = p.live?.changePct ?? p.changePct;
@@ -486,6 +499,7 @@ function SimpleCard({ p }: { p: Pick }) {
         </div>
         <p className="text-xs text-text/85 mt-1 leading-snug">{v.act.text}</p>
       </div>
+      <ShortNote p={p} />
 
       <div className="grid grid-cols-3 gap-2 mt-3 text-center">
         {[

@@ -1,6 +1,6 @@
 // 서버 전용: Yahoo quoteSummary(재무·일정·업종) + 종목 뉴스 + 비교 기업
 // 서버에서만 사용 (instrumentation 스케줄러에서도 불러오므로 server-only 표시는 쓰지 않음)
-import type { Fundamentals, NewsItem } from "./types";
+import type { Fundamentals, LastQuarter, NewsItem } from "./types";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 const TTL_MS = 6 * 60 * 60 * 1000;
@@ -41,16 +41,39 @@ const n = (v: Raw): number | null => {
   return null;
 };
 
+type ShareHistory = { diluted: number | null; changeYoY: number | null; fcf: number | null; ocf: number | null; lastQuarter: LastQuarter | null };
+
+/** 가장 최근 분기 실적과 1년 전 같은 분기 (매출·주당순이익) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lastQuarterOf(j: any): LastQuarter | null {
+  const pts = (type: string): { d: string; v: number }[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = (j?.timeseries?.result ?? []).find((x: any) => x?.meta?.type?.[0] === type);
+    return ((r?.[type] ?? []) as ({ asOfDate: string; reportedValue?: { raw?: number } } | null)[])
+      .filter((x) => x && typeof x.reportedValue?.raw === "number")
+      .map((x) => ({ d: x!.asOfDate, v: x!.reportedValue!.raw! }))
+      .sort((a, b) => a.d.localeCompare(b.d));
+  };
+  const rev = pts("quarterlyTotalRevenue");
+  const eps = pts("quarterlyDilutedEPS");
+  const end = [rev.at(-1)?.d, eps.at(-1)?.d].filter(Boolean).sort().at(-1);
+  if (!end) return null;
+  // 1년 전 같은 분기: 분기 말 날짜가 330~400일 앞선 값
+  const yearAgo = (s: { d: string; v: number }[]) => s.find((x) => { const gap = (Date.parse(end) - Date.parse(x.d)) / 86400_000; return gap >= 330 && gap <= 400; })?.v ?? null;
+  const at = (s: { d: string; v: number }[]) => s.find((x) => x.d === end)?.v ?? null;
+  return { end, revenue: at(rev), revenuePrev: yearAgo(rev), eps: at(eps), epsPrev: yearAgo(eps) };
+}
+
 /** 주식 수 이력 (희석 확인용): 최근 분기 희석 평균 주식 수 + 1년 전 대비 발행주식 수 변화 */
-async function getShareHistory(sym: string): Promise<{ diluted: number | null; changeYoY: number | null; fcf: number | null; ocf: number | null }> {
+async function getShareHistory(sym: string): Promise<ShareHistory> {
   try {
     const p2 = Math.floor(Date.now() / 1000);
     const p1 = p2 - 2 * 365 * 86400;
     const res = await fetch(
-      `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?type=quarterlyDilutedAverageShares,quarterlyOrdinarySharesNumber,trailingFreeCashFlow,trailingOperatingCashFlow&period1=${p1}&period2=${p2}`,
+      `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?type=quarterlyDilutedAverageShares,quarterlyOrdinarySharesNumber,trailingFreeCashFlow,trailingOperatingCashFlow,quarterlyTotalRevenue,quarterlyDilutedEPS&period1=${p1}&period2=${p2}`,
       { headers: { "User-Agent": UA }, cache: "no-store" },
     );
-    if (!res.ok) return { diluted: null, changeYoY: null, fcf: null, ocf: null };
+    if (!res.ok) return { diluted: null, changeYoY: null, fcf: null, ocf: null, lastQuarter: null };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const j: any = await res.json();
     const series = (type: string): number[] => {
@@ -68,9 +91,9 @@ async function getShareHistory(sym: string): Promise<{ diluted: number | null; c
     // 현금흐름표 기준 최근 12개월 FCF(영업현금흐름 − 설비투자). financialData의 FCF는 추정치(levered)라 오차가 큼
     const fcf = series("trailingFreeCashFlow");
     const ocf = series("trailingOperatingCashFlow");
-    return { diluted: dil.length ? dil[dil.length - 1] : null, changeYoY, fcf: fcf.length ? fcf[fcf.length - 1] : null, ocf: ocf.length ? ocf[ocf.length - 1] : null };
+    return { diluted: dil.length ? dil[dil.length - 1] : null, changeYoY, fcf: fcf.length ? fcf[fcf.length - 1] : null, ocf: ocf.length ? ocf[ocf.length - 1] : null, lastQuarter: lastQuarterOf(j) };
   } catch {
-    return { diluted: null, changeYoY: null, fcf: null, ocf: null };
+    return { diluted: null, changeYoY: null, fcf: null, ocf: null, lastQuarter: null };
   }
 }
 
@@ -147,8 +170,10 @@ export async function getFundamentals(symbol: string): Promise<Fundamentals | nu
     forwardEps: n(ks.forwardEps),
     trailingEps: n(ks.trailingEps),
     shortPercentFloat: n(ks.shortPercentOfFloat),
+    shortRatio: n(ks.shortRatio),
     beta: n(ks.beta) ?? n(sd.beta),
     earningsDate: n(earn[0]),
+    lastQuarter: sh.lastQuarter,
     quarterlyRevenue: (qs as { endDate?: { fmt?: string }; totalRevenue?: Raw }[])
       .map((q) => ({ date: q.endDate?.fmt ?? "", revenue: n(q.totalRevenue) }))
       .filter((q: { revenue: number | null }) => q.revenue != null) as { date: string; revenue: number }[],

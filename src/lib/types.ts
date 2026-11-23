@@ -197,6 +197,8 @@ export interface Pick {
   plan?: PickPlan | null;
   blocked?: string | null;
   earningsDate?: number | null; // 다음 실적 발표 (UNIX초)
+  shortPct?: number | null; // 유통주식 대비 공매도 비율 (소수)
+  shortDays?: number | null; // 공매도 청산 일수
   resilienceSummary: string;
   // 순위 추적 (Top 10에 든 종목만)
   rank?: number;
@@ -266,9 +268,19 @@ export interface Fundamentals {
   dilutedShares?: number | null; // 최근 분기 희석 평균 주식 수 (스톡옵션·전환사채 등 포함)
   sharesChangeYoY?: number | null; // 1년 전 대비 발행주식 수 변화 (0.1 = 10% 희석)
   shortPercentFloat: number | null;
+  shortRatio?: number | null; // 공매도 청산 일수 (평균 거래량 기준)
   beta: number | null;
   earningsDate: number | null; // 가장 최근 또는 다음 실적 발표 (UNIX초)
   quarterlyRevenue: { date: string; revenue: number }[]; // 최신순
+  lastQuarter?: LastQuarter | null; // 최근 분기 실적 vs 1년 전 같은 분기
+}
+
+export interface LastQuarter {
+  end: string; // 분기 마지막 날 YYYY-MM-DD
+  revenue: number | null;
+  revenuePrev: number | null;
+  eps: number | null; // 희석 주당순이익
+  epsPrev: number | null;
 }
 
 export interface NewsItem {

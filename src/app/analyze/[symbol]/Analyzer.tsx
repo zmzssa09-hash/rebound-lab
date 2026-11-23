@@ -16,6 +16,8 @@ import { GradeBoxes, ResiliencePanel, ValuationPanel } from "@/components/Valuat
 import { TradePlanPanel } from "@/components/TradePlanPanel";
 import Krw from "@/components/Krw";
 import HolderGuide from "@/components/HolderGuide";
+import EarningsResult from "@/components/EarningsResult";
+import { shortRisk } from "@/lib/shortInterest";
 import { askAi } from "@/components/ChatWidget";
 
 export default function Analyzer({ symbol }: { symbol: string }) {
@@ -67,6 +69,7 @@ export default function Analyzer({ symbol }: { symbol: string }) {
   const { meta } = data;
   const cur = meta.currency;
   const kind = etpKind(symbol);
+  const sr = shortRisk(insight.data?.fundamentals?.shortPercentFloat, insight.data?.fundamentals?.shortRatio);
 
   const addToWatch = () =>
     setData((d) => ({ ...d, watchlist: [...d.watchlist, { id: uid(), symbol, zones: [] }] }));
@@ -114,6 +117,11 @@ export default function Analyzer({ symbol }: { symbol: string }) {
       </div>
 
       {kind && <EtpWarning kind={kind} symbol={symbol} />}
+      {sr && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${TONE_CLASS[sr.tone]}`}>
+          <b>⚡ {sr.label}</b> <span className="text-text/90">— {sr.text}</span>
+        </div>
+      )}
 
       {/* 판정 */}
       <div className={`rounded-xl border p-5 ${TONE_CLASS[verdict.tone]}`}>
@@ -133,6 +141,9 @@ export default function Analyzer({ symbol }: { symbol: string }) {
 
       {/* 단기·장기 등급 */}
       <GradeBoxes grades={insight.data?.grades ?? null} loading={insight.loading} />
+
+      {/* 최근 실적 */}
+      <EarningsResult f={insight.data?.fundamentals ?? null} />
 
       {/* 하락 이유 */}
       <DropReasonPanel

@@ -230,6 +230,7 @@ function brief(p: Pick, c: ChatCard) {
     t1Pct: p.plan?.t1?.pct != null ? Math.round(p.plan.t1.pct) : null,
     stopPct: p.plan?.stop?.pct != null ? Math.round(p.plan.stop.pct) : null,
     rr: p.plan?.rr != null ? Number(p.plan.rr.toFixed(1)) : null,
+    shortInterestPct: p.shortPct != null ? Math.round(p.shortPct * 100) : null,
   };
 }
 
@@ -294,6 +295,7 @@ const ANSWER_SYSTEM = `너는 미국 주식 추천 사이트 '리바운드 랩'�
 - 숫자(가격·점수·적정가·손절가 등)는 반드시 아래 [사이트 데이터]에 있는 값만 쓴다. 데이터에 없는 숫자·뉴스·사실은 지어내지 말고 "사이트 데이터에 없다"고 말한다.
 - "반드시 오른다", "무조건 사라" 같은 단정·보장은 하지 않는다. 판단은 사이트 규칙(매수 구간, 손절가, 실적 발표 전 매수 금지, 회피 신호)으로 안내한다.
 - 종목마다 action 값(지금 해야 할 일)을 데이터 그대로 정확히 쓴다. 여러 종목을 한데 묶어 같은 action이라고 말하지 마라.
+- shortInterestPct(공매도 비율 %)가 10 이상이면 "공매도가 많아 변동이 클 수 있다"고 짚어 준다.
 - earningsDate는 다가오는 실적 발표일이다(없으면 예정 없음/이미 지남). today를 기준으로 말한다.
 - 종목마다 핵심만: 지금 해야 할 일(action), 왜 떨어졌는지(dropReasons/dropNature), 점수·등급, 적정가 대비 여유(upside), 손절가. 걸러낸 종목이면 excludeReason을 쉽게 풀어서 왜 피해야 하는지 말한다.
 - 과매도(oversold=false)가 아닌 종목은 "지금은 사이트의 추천 대상(많이 떨어진 종목)이 아니다"라고 알려준다.
