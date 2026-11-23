@@ -109,7 +109,7 @@ function Positions() {
         <PositionForm
           key={formTarget === "new" ? "new" : formTarget.id}
           initial={formTarget === "new" ? undefined : formTarget}
-          prefill={formTarget === "new" && addSym ? { symbol: addSym, avgCost: Number(params.get("price")) || undefined } : undefined}
+          prefill={formTarget === "new" && addSym ? { symbol: addSym, avgCost: Number(params.get("price")) || undefined, stop: Number(params.get("stop")) || undefined, target: Number(params.get("target")) || undefined } : undefined}
           onClose={closeForm}
         />
       )}
@@ -248,15 +248,15 @@ function PositionForm({
   onClose,
 }: {
   initial?: Position;
-  prefill?: { symbol: string; avgCost?: number };
+  prefill?: { symbol: string; avgCost?: number; stop?: number; target?: number };
   onClose: () => void;
 }) {
   const [f, setF] = useState({
     symbol: initial?.symbol ?? prefill?.symbol ?? "",
     shares: initial?.shares?.toString() ?? "",
     avgCost: initial?.avgCost?.toString() ?? prefill?.avgCost?.toString() ?? "",
-    target: initial?.target?.toString() ?? "",
-    stop: initial?.stop?.toString() ?? "",
+    target: initial?.target?.toString() ?? prefill?.target?.toString() ?? "",
+    stop: initial?.stop?.toString() ?? prefill?.stop?.toString() ?? "",
     deadline: initial?.deadline ?? "",
     thesis: initial?.thesis ?? "",
     invalidation: initial?.invalidation ?? "",

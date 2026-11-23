@@ -15,6 +15,8 @@ import DropReasonPanel from "@/components/DropReasonPanel";
 import { GradeBoxes, ResiliencePanel, ValuationPanel } from "@/components/ValuationPanel";
 import { TradePlanPanel } from "@/components/TradePlanPanel";
 import Krw from "@/components/Krw";
+import HolderGuide from "@/components/HolderGuide";
+import { askAi } from "@/components/ChatWidget";
 
 export default function Analyzer({ symbol }: { symbol: string }) {
   const { data, error, loading } = useChart(symbol);
@@ -97,6 +99,9 @@ export default function Analyzer({ symbol }: { symbol: string }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className="btn btn-primary" onClick={() => askAi(`${meta.nameKo ?? meta.name}(${symbol}) 주식을 처음 하는 사람도 알기 쉽게 설명해줘. 무슨 회사인지, 왜 떨어졌는지, 지금 사도 되는지, 산다면 손절가와 목표가는 얼마인지.`)}>
+            🤖 AI 쉬운 설명
+          </button>
           {watch ? (
             <Link href="/watchlist" className="btn">관심 종목에서 보기</Link>
           ) : (
@@ -121,7 +126,10 @@ export default function Analyzer({ symbol }: { symbol: string }) {
       </div>
 
       {/* 지금 사도 될까: 행동 지침 + 매수 구간 + 목표가·손절 */}
-      <TradePlanPanel plan={insight.data?.plan ?? null} price={snap.price} blocked={insight.data?.blocked ?? null} loading={insight.loading} shortScore={insight.data?.grades.short.score ?? null} earningsAt={insight.data?.fundamentals?.earningsDate ?? null} />
+      <TradePlanPanel plan={insight.data?.plan ?? null} price={snap.price} blocked={insight.data?.blocked ?? null} loading={insight.loading} shortScore={insight.data?.grades.short.score ?? null} earningsAt={insight.data?.fundamentals?.earningsDate ?? null} symbol={symbol} />
+
+      {/* 이미 샀다면 */}
+      <HolderGuide symbol={symbol} price={snap.price} plan={insight.data?.plan ?? null} blocked={insight.data?.blocked ?? null} earningsAt={insight.data?.fundamentals?.earningsDate ?? null} position={position} />
 
       {/* 단기·장기 등급 */}
       <GradeBoxes grades={insight.data?.grades ?? null} loading={insight.loading} />

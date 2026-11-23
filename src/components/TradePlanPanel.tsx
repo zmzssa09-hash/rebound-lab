@@ -1,5 +1,7 @@
 "use client";
-import PositionSizer from "@/components/PositionSizer";
+import BuyChecklist from "@/components/BuyChecklist";
+import PositionSizer, { useSizing } from "@/components/PositionSizer";
+import { simpleKeyOf } from "@/lib/simple";
 import Term from "@/components/Term";
 import { Chip, Section, TONE_CLASS } from "@/components/ui";
 import { money, pct } from "@/lib/format";
@@ -9,7 +11,8 @@ import type { PickPlan } from "@/lib/types";
 const pr = (v: number | null) => (v == null ? "–" : `${(v * 100).toFixed(0)}%`);
 
 /** 지금 해야 할 일 + 매수 구간 + 단기 목표가·손절 */
-export function TradePlanPanel({ plan, price, blocked, loading, shortScore = null, earningsAt = null }: { plan: TradePlan | null; price: number; blocked: string | null; loading: boolean; shortScore?: number | null; earningsAt?: number | null }) {
+export function TradePlanPanel({ plan, price, blocked, loading, shortScore = null, earningsAt = null, symbol }: { plan: TradePlan | null; price: number; blocked: string | null; loading: boolean; shortScore?: number | null; earningsAt?: number | null; symbol?: string }) {
+  const { s: sizing } = useSizing();
   if (loading || !plan) return <div className="card h-48 animate-pulse" />;
   const zone = zoneOf(plan.zones, price);
   const act = actionOf({ blocked, zone, price, stop: plan.stop?.price ?? null, rr: plan.rr, shortScore, earningsAt });
@@ -64,6 +67,12 @@ export function TradePlanPanel({ plan, price, blocked, loading, shortScore = nul
       <div className="mt-4">
         <PositionSizer price={price} stop={plan.stop?.price ?? null} target={plan.t1?.price ?? null} />
       </div>
+
+      {symbol && simpleKeyOf(act.title) === "buy" && (
+        <div className="mt-4">
+          <BuyChecklist symbol={symbol} price={price} stop={plan.stop?.price ?? null} t1={plan.t1?.price ?? null} earningsDays={ed} maxWeight={sizing.maxWeight} />
+        </div>
+      )}
 
       {plan.notes.length > 0 && (
         <ul className="mt-3 text-xs text-warn space-y-0.5">

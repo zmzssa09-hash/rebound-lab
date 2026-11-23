@@ -16,6 +16,12 @@ interface Msg {
 
 const EXAMPLES = ["지금 살 만한 종목 있어?", "엔비디아 지금 사도 돼?", "기술주 중에 적정가보다 싼 거", "걸러낸 종목은 왜 위험해?", "RSI가 뭐야?"];
 const STORE = "rl-chat-v1";
+const ASK_EVENT = "rl:ask";
+
+/** 다른 화면에서 AI 상담 창을 열고 질문 보내기 */
+export function askAi(question: string) {
+  window.dispatchEvent(new CustomEvent(ASK_EVENT, { detail: question }));
+}
 
 const ACTION_TONE: Record<string, string> = {
   "적극 매수 검토": "text-good border-good/40",
@@ -122,6 +128,19 @@ export default function ChatWidget() {
       setBusy(false);
     }
   };
+
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+  useEffect(() => {
+    const on = (e: Event) => {
+      setOpen(true);
+      sendRef.current(String((e as CustomEvent).detail ?? ""));
+    };
+    window.addEventListener(ASK_EVENT, on);
+    return () => window.removeEventListener(ASK_EVENT, on);
+  }, []);
 
   if (pathname?.startsWith("/api")) return null;
 
